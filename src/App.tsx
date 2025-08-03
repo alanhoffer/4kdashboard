@@ -6,7 +6,7 @@ import { Routes, Route, BrowserRouter } from "react-router-dom";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "./components/AppSidebar";
 import Index from "@/pages/Index";
-import ServerDetails from "@/pages/ServerDetails";
+import ServerDetails from "@/pages/DealerDetails";
 import FileManager from "@/pages/FileManager";
 import Analytics from "@/pages/Analytics";
 import Settings from "@/pages/Settings";
@@ -27,7 +27,7 @@ function App() {
                 <Sonner />
                 <Routes>
                   <Route path="/" element={<Index />} />
-                  <Route path="/server/:id" element={<ServerDetails />} />
+                  <Route path="/dealer/:id" element={<ServerDetails />} />
                   <Route path="/files" element={<FileManager />} />
                   <Route path="/analytics" element={<Analytics />} />
                   <Route path="/settings" element={<Settings />} />

@@ -1,11 +1,3 @@
-import { clsx, type ClassValue } from "clsx"
-import { twMerge } from "tailwind-merge"
-
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
-}
-
-
 import { DealerFile } from '../data/dealers';
 
 export function isSameDay(date1: string, date2: string) {

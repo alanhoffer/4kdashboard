@@ -31,7 +31,7 @@ const FileUpload = () => {
   const [isDragOver, setIsDragOver] = useState(false);
   const { toast } = useToast();
 
-  const onlineDealers = dealers.filter(dealer => dealer.status === 'online');
+  const onlineDealers = dealers.filter(dealer => dealer.status === 'Active');
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);

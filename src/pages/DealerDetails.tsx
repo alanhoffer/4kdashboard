@@ -57,7 +57,7 @@ const DealerDetails = () => {
         </Button>
         <div>
           <h1 className="text-2xl font-bold text-slate-800">{dealer.name}</h1>
-          <p className="text-sm text-slate-600">{dealer.location} • {dealer.ip}</p>
+          <p className="text-sm text-slate-600">{dealer.dealerId} • {dealer.location}</p>
         </div>
       </header>
       
@@ -85,56 +85,43 @@ const DealerDetails = () => {
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2">
                             <Cpu className="h-4 w-4 text-blue-600" />
-                            <span className="text-sm font-medium">CPU Usage</span>
+                            <span className="text-sm font-medium">Agent</span>
                           </div>
-                          <span className="text-sm text-slate-600">{dealer.cpu}%</span>
+                          <span className="text-sm text-slate-600">{dealer.server}</span>
                         </div>
-                        <Progress value={dealer.cpu} className="h-3" />
                       </div>
                       
                       <div>
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2">
                             <HardDrive className="h-4 w-4 text-purple-600" />
-                            <span className="text-sm font-medium">Memory Usage</span>
+                            <span className="text-sm font-medium">SAP Version</span>
                           </div>
-                          <span className="text-sm text-slate-600">{dealer.memory}%</span>
+                          <span className="text-sm text-slate-600">{dealer.sapSystem}</span>
                         </div>
-                        <Progress value={dealer.memory} className="h-3" />
                       </div>
                       
                       <div>
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2">
                             <Database className="h-4 w-4 text-green-600" />
-                            <span className="text-sm font-medium">Disk Usage</span>
+                            <span className="text-sm font-medium">DB Version</span>
                           </div>
-                          <span className="text-sm text-slate-600">{dealer.disk}%</span>
+                          <span className="text-sm text-slate-600">{dealer.dbArchitecture}</span>
                         </div>
-                        <Progress value={dealer.disk} className="h-3" />
                       </div>
                     </div>
                   </div>
                   
                   <div>
-                    <h3 className="font-semibold text-slate-700 mb-3">Dealer Details</h3>
+                    <h3 className="font-semibold text-slate-700 mb-3">Contacts Details</h3>
                     <div className="space-y-3">
-                      <div className="flex justify-between">
-                        <span className="text-sm text-slate-600">Type:</span>
-                        <Badge variant="outline">{dealer.type}</Badge>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-sm text-slate-600">OS:</span>
-                        <span className="text-sm font-medium">{dealer.os}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-sm text-slate-600">Uptime:</span>
-                        <span className="text-sm font-medium">{dealer.uptime}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-sm text-slate-600">Load Average:</span>
-                        <span className="text-sm font-medium">{dealer.loadAverage}</span>
-                      </div>
+                      {dealer.contacts.map(contact => (
+                        <div key={contact.id} className="flex justify-between">
+                          <span className="text-sm text-slate-600">{contact.name}</span>
+                          <span className="text-sm font-medium">{contact.email}</span>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -152,32 +139,32 @@ const DealerDetails = () => {
               <CardHeader className="bg-gradient-to-r from-green-50 to-blue-50">
                 <CardTitle className="flex items-center gap-2">
                   <Activity className="h-5 w-5 text-green-600" />
-                  Status
+                  Last File
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-6">
                 <div className="text-center space-y-4">
                   <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full ${
-                    dealer.status === 'online' ? 'bg-green-100 text-green-800' :
-                    dealer.status === 'warning' ? 'bg-white text-yellow-600 border border-yellow-200' :
+                    dealer.server === 'Fabric' ? 'bg-green-100 text-green-800' :
+                    dealer.server === 'Agent' ? 'bg-white text-yellow-600 border border-yellow-200' :
                     'bg-red-100 text-red-800'
                   }`}>
                     <div className={`w-2 h-2 rounded-full ${
-                      dealer.status === 'online' ? 'bg-green-500' :
-                      dealer.status === 'warning' ? 'bg-yellow-500' :
+                      dealer.server === 'Fabric' ? 'bg-green-500' :
+                      dealer.server === 'Agent' ? 'bg-yellow-500' :
                       'bg-red-500'
                     }`} />
-                    <span className="font-medium capitalize">{dealer.status}</span>
+                    <span className="font-medium capitalize">{dealer.files[0]?.name}</span>
                   </div>
                   
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-slate-600">Response Time:</span>
-                      <span className="text-sm font-medium">{dealer.responseTime}ms</span>
+                      <span className="text-sm font-medium">{dealer.files[0]?.lastSent}</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-slate-600">Last Check:</span>
-                      <span className="text-sm font-medium">{dealer.lastCheck}</span>
+                      <span className="text-sm font-medium">{dealer.files[0]?.status}</span>
                     </div>
                   </div>
                 </div>

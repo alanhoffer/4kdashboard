@@ -5,13 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Link } from 'react-router-dom';
-import { 
-  Server, 
-  Cpu, 
-  HardDrive, 
-  Wifi, 
-  AlertTriangle, 
-  CheckCircle, 
+import {
+  Server,
+  Cpu,
+  HardDrive,
+  Wifi,
+  AlertTriangle,
+  CheckCircle,
   XCircle,
   Activity,
   Users,
@@ -20,26 +20,30 @@ import {
 } from 'lucide-react';
 import { dealers } from '../data/dealers';
 import FileStatus from '../components/FileStatus';
+import { useDealersWithFiles } from '@/hooks/useDealersWithFiles';
 
 const Index = () => {
-  const onlineDealers = dealers.filter(s => s.status === 'online').length;
-  const offlineDealers = dealers.filter(s => s.status === 'offline').length;
-  const warningDealers = dealers.filter(s => s.status === 'warning').length;
+  const dealers = useDealersWithFiles();
+  console.log('Dealers with files:', dealers);
+
+  const allFiles = dealers.flatMap(d => d.files);
+  const totalFiles = allFiles.filter(f => f.status !== 'disabled').length;
+  const sentFiles = allFiles.filter(f => f.status === 'sent').length;
+  const pendingFiles = allFiles.filter(f => f.status === 'pending').length;
+  const failedFiles = allFiles.filter(f => f.status === 'failed').length;
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'online': return <CheckCircle className="h-4 w-4 text-green-500" />;
-      case 'offline': return <XCircle className="h-4 w-4 text-red-500" />;
-      case 'warning': return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
+      case 'Active': return <CheckCircle className="h-4 w-4 text-green-500" />;
+      case 'Inactive': return <XCircle className="h-4 w-4 text-gray-500" />;
       default: return <Server className="h-4 w-4 text-gray-500" />;
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'online': return 'bg-green-100 text-green-800 border-green-200';
-      case 'offline': return 'bg-red-100 text-red-800 border-red-200';
-      case 'warning': return 'bg-white text-yellow-600 border-yellow-200';
+      case 'Active': return 'bg-green-100 text-green-800 border-green-200';
+      case 'Inactive': return 'bg-gray-100 text-gray-800 border-gray-200';
       default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
@@ -49,11 +53,11 @@ const Index = () => {
       <header className="flex items-center sticky top-0 z-10 gap-4 border-b border-slate-200 bg-white backdrop-blur-sm px-6 py-4">
         <SidebarTrigger />
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">Server Overview</h1>
-          <p className="text-sm text-slate-600">Monitor your infrastructure in real-time</p>
+          <h1 className="text-2xl font-bold text-slate-800">Resumen del dealer</h1>
+          <p className="text-sm text-slate-600">Supervisa la información de tu dealer en tiempo real</p>
         </div>
       </header>
-      
+
       <main className="flex-1 overflow-auto p-6 space-y-6">
         {/* Status Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -67,7 +71,7 @@ const Index = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-green-700">Enviados</p>
-                    <p className="text-2xl font-bold text-green-800">{onlineDealers}</p>
+                    <p className="text-2xl font-bold text-green-800">{sentFiles}</p>
                   </div>
                   <CheckCircle className="h-8 w-8 text-green-600" />
                 </div>
@@ -85,7 +89,7 @@ const Index = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-yellow-700">Generados</p>
-                    <p className="text-2xl font-bold text-yellow-800">{warningDealers}</p>
+                    <p className="text-2xl font-bold text-yellow-800">{pendingFiles}</p>
                   </div>
                   <AlertTriangle className="h-8 w-8 text-yellow-600" />
                 </div>
@@ -103,7 +107,7 @@ const Index = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-red-700">Error</p>
-                    <p className="text-2xl font-bold text-red-800">{offlineDealers}</p>
+                    <p className="text-2xl font-bold text-red-800">{failedFiles}</p>
                   </div>
                   <XCircle className="h-8 w-8 text-red-600" />
                 </div>
@@ -121,7 +125,7 @@ const Index = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-blue-700">Total</p>
-                    <p className="text-2xl font-bold text-blue-800">{dealers.length}</p>
+                    <p className="text-2xl font-bold text-blue-800">{totalFiles}</p>
                   </div>
                   <Server className="h-8 w-8 text-blue-600" />
                 </div>
@@ -147,7 +151,7 @@ const Index = () => {
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: index * 0.1 }}
                 >
-                  <Link 
+                  <Link
                     to={`/dealer/${dealer.id}`}
                     className="block p-6 hover:bg-slate-50 transition-colors"
                   >
@@ -155,42 +159,37 @@ const Index = () => {
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-4">
                           <div className="p-2 bg-slate-100 rounded-lg">
-                            {dealer.type === 'web' && <Globe className="h-5 w-5 text-blue-600" />}
-                            {dealer.type === 'database' && <HardDrive className="h-5 w-5 text-purple-600" />}
-                            {dealer.type === 'api' && <Wifi className="h-5 w-5 text-green-600" />}
+                            {dealer.server === 'Fabric' && <Globe className="h-5 w-5 text-blue-600" />}
+                            {dealer.server === 'Agent' && <HardDrive className="h-5 w-5 text-purple-600" />}
                           </div>
                           <div>
                             <h3 className="font-semibold text-slate-800">{dealer.name}</h3>
-                            <p className="text-sm text-slate-600">{dealer.location} • {dealer.ip}</p>
+                            <p className="text-sm text-slate-600">{dealer.dealerId} • {dealer.location}</p>
                           </div>
                         </div>
-                        
+
                         <div className="flex items-center gap-6">
                           <div className="text-right">
                             <div className="flex items-center gap-2 mb-1">
                               <Cpu className="h-4 w-4 text-slate-500" />
-                              <span className="text-sm text-slate-600">CPU</span>
+                              <span className="text-sm text-slate-600">{dealer.dbArchitecture}</span>
                             </div>
-                            <Progress value={dealer.cpu} className="w-20 h-2" />
-                            <span className="text-xs text-slate-500">{dealer.cpu}%</span>
                           </div>
-                          
+
                           <div className="text-right">
                             <div className="flex items-center gap-2 mb-1">
                               <HardDrive className="h-4 w-4 text-slate-500" />
-                              <span className="text-sm text-slate-600">Memory</span>
+                              <span className="text-sm text-slate-600">{dealer.sapSystem}</span>
                             </div>
-                            <Progress value={dealer.memory} className="w-20 h-2" />
-                            <span className="text-xs text-slate-500">{dealer.memory}%</span>
                           </div>
-                          
+
                           <Badge className={`${getStatusColor(dealer.status)} flex items-center gap-1`}>
                             {getStatusIcon(dealer.status)}
                             {dealer.status}
                           </Badge>
                         </div>
                       </div>
-                      
+
                       {/* File Status Section */}
                       <div className="flex items-start gap-3 pl-14">
                         <div className="flex items-center gap-2 text-sm text-slate-600 min-w-0">
