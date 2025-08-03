@@ -2,7 +2,6 @@ import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { CheckCircle, Clock, XCircle, Minus } from 'lucide-react';
 import { DealerFile } from '../data/dealers';
-import { summarizeFilesToday } from '../helpers/files'; // ajustá ruta
 
 interface FileStatusProps {
   files: DealerFile[];
@@ -10,8 +9,6 @@ interface FileStatusProps {
 }
 
 const FileStatus: React.FC<FileStatusProps> = ({ files, compact = false }) => {
-  const filesToShow = summarizeFilesToday(files);
-
   const getFileIcon = (status: string) => {
     switch (status) {
       case 'sent': return <CheckCircle className="h-3 w-3 text-green-500" />;
@@ -35,8 +32,8 @@ const FileStatus: React.FC<FileStatusProps> = ({ files, compact = false }) => {
   if (compact) {
     return (
       <div className="flex items-center gap-1">
-        {filesToShow.map((file) => (
-          <div key={file.id} className="flex items-center gap-1">
+        {files.map((file) => (
+          <div key={file.name} className="flex items-center gap-1">
             {getFileIcon(file.status)}
             <span className="text-xs text-slate-600">{file.name}</span>
           </div>
@@ -47,9 +44,9 @@ const FileStatus: React.FC<FileStatusProps> = ({ files, compact = false }) => {
 
   return (
     <div className="grid grid-cols-2 gap-2">
-      {filesToShow.map((file) => (
+      {files.map((file) => (
         <Badge
-          key={file.id}
+          key={file.name}
           variant="outline"
           className={`flex w-full items-center justify-between text-xs ${getFileStatusColor(file.status)}`}
         >
@@ -57,9 +54,7 @@ const FileStatus: React.FC<FileStatusProps> = ({ files, compact = false }) => {
             {getFileIcon(file.status)}
             <span>{file.name}</span>
           </div>
-          <span className="text-xs text-slate-400">
-            {file.lastSent ? new Date(file.lastSent).toLocaleDateString() : 'No enviado hoy'}
-          </span>
+          <span className="text-xs text-slate-400">xxx</span>
         </Badge>
       ))}
     </div>
