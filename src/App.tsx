@@ -13,6 +13,8 @@ import Settings from "@/pages/Settings";
 import NotFound from "@/pages/NotFound";
 import { useDealersWithFiles } from "./hooks/useDealersWithFiles";
 import { DealerProvider } from "./context/DealerContext";
+import ManageServers from "./pages/ManageServers";
+import Transform from "./pages/Transform";
 
 const queryClient = new QueryClient();
 
@@ -32,6 +34,8 @@ function App() {
                     <Route path="/" element={<Index />} />
                     <Route path="/dealer/:id" element={<ServerDetails />} />
                     <Route path="/files" element={<FileManager />} />
+                    <Route path="/transform" element={<Transform />} />
+                    <Route path="/manage-servers" element={<ManageServers />} />
                     <Route path="/analytics" element={<Analytics />} />
                     <Route path="/settings" element={<Settings />} />
                     <Route path="*" element={<NotFound />} />

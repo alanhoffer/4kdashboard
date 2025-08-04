@@ -11,7 +11,7 @@ import {
   SidebarMenuItem,
   SidebarHeader,
 } from "@/components/ui/sidebar";
-import { Server, BarChart3, Hammer, Settings, FolderOpen, Sun, Moon } from 'lucide-react';
+import { Server, BarChart3, Hammer, Settings, FolderOpen, Sun, Moon, FileSpreadsheet, Edit } from 'lucide-react';
 import Logo from '../images/logo/logo.png';
 
 export function AppSidebar() {
@@ -62,6 +62,8 @@ export function AppSidebar() {
     { title: 'Server Overview', icon: Server, href: '/' },
     { title: 'File Manager', icon: FolderOpen, href: '/files' },
     { title: 'Analytics', icon: BarChart3, href: '/analytic' },
+    { title: 'Transform Data', icon: FileSpreadsheet, href: '/transform' },
+    { title: 'Manage Servers', icon: Edit, href: '/manage-servers' },
     { title: 'Tools', icon: Hammer, href: '/tools' },
     { title: 'Settings', icon: Settings, href: '/settings' },
   ];
