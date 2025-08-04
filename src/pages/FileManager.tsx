@@ -1,86 +1,35 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { 
-  FolderOpen, 
-  Upload, 
-  Download, 
-  Trash2, 
+import {
+  FolderOpen,
+  Upload,
+  Download,
+  Trash2,
   Search,
   File,
   Folder,
-  MoreVertical,
   Eye,
   Edit,
   Server
 } from 'lucide-react';
 import FileUpload from '../components/FileUpload';
-import { dealers } from '../data/dealers';
-
-interface FileItem {
-  id: string;
-  name: string;
-  type: 'file' | 'folder';
-  size?: number;
-  modified: string;
-  dealerId: string;
-  path: string;
-}
+import { useDealerContext } from '@/context/DealerContext';
+import { isToday } from 'date-fns';
 
 const FileManager = () => {
+  const { dealers, loading } = useDealerContext();
+
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDealer, setSelectedDealer] = useState<string>('all');
 
-  // Sample file data
-  const files: FileItem[] = [
-    {
-      id: '1',
-      name: 'config.json',
-      type: 'file',
-      size: 2048,
-      modified: '2 hours ago',
-      dealerId: '1',
-      path: '/etc/app/'
-    },
-    {
-      id: '2',
-      name: 'logs',
-      type: 'folder',
-      modified: '1 day ago',
-      dealerId: '1',
-      path: '/var/log/'
-    },
-    {
-      id: '3',
-      name: 'database.sql',
-      type: 'file',
-      size: 15728640,
-      modified: '3 hours ago',
-      dealerId: '2',
-      path: '/backup/'
-    },
-    {
-      id: '4',
-      name: 'uploads',
-      type: 'folder',
-      modified: '30 minutes ago',
-      dealerId: '3',
-      path: '/var/www/'
-    },
-    {
-      id: '5',
-      name: 'app.log',
-      type: 'file',
-      size: 524288,
-      modified: '15 minutes ago',
-      dealerId: '1',
-      path: '/var/log/app/'
-    }
-  ];
+  // PAGINACIÓN
+  const [currentPage, setCurrentPage] = useState(1);
+  const filesPerPage = 6;
 
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
@@ -95,11 +44,49 @@ const FileManager = () => {
     return dealer ? dealer.name : 'Unknown Dealer';
   };
 
-  const filteredFiles = files.filter(file => {
-    const matchesSearch = file.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesDealer = selectedDealer === 'all' || file.dealerId === selectedDealer;
-    return matchesSearch && matchesDealer;
+  const allDealerFiles = dealers.flatMap(dealer =>
+    dealer.files.map(file => ({
+      ...file,
+      dealerId: dealer.id,
+      dealerName: dealer.name,
+      clientId: dealer.clientId,
+    }))
+  );
+
+  const filteredFiles = allDealerFiles.filter(file => {
+    const nameMatch = file.fileName?.toLowerCase().includes(searchTerm.toLowerCase());
+    const dealerMatch = selectedDealer === 'all' || file.dealerId === selectedDealer;
+    return nameMatch && dealerMatch;
   });
+
+  // Calculo paginación
+  const totalFiles = filteredFiles.length;
+  const totalPages = Math.ceil(totalFiles / filesPerPage);
+  const indexOfLastFile = currentPage * filesPerPage;
+  const indexOfFirstFile = indexOfLastFile - filesPerPage;
+  const currentFiles = filteredFiles.slice(indexOfFirstFile, indexOfLastFile);
+  const recentUploadsCount = filteredFiles.filter(file => file.shipmentDatetime && isToday(file.shipmentDatetime)).length;
+  // Sumar tamaños en MB de los archivos filtrados (o de todos)
+  const totalSizeMb = filteredFiles.reduce((acc, file) => acc + Number(file.fileSizeMb || 0), 0);
+  // Convertir MB a GB (1 GB = 1024 MB)
+  const totalSizeGb = totalSizeMb / 1024;
+
+  // Mostrar con 2 decimales
+  const totalSizeFormatted = totalSizeGb.toFixed(2);
+
+
+  // Reset página al cambiar filtros
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedDealer]);
+
+  const goToNextPage = () => {
+    setCurrentPage(page => Math.min(page + 1, totalPages));
+  };
+
+  const goToPreviousPage = () => {
+    setCurrentPage(page => Math.max(page - 1, 1));
+  };
 
   return (
     <div className="flex flex-col h-full w-full">
@@ -110,22 +97,15 @@ const FileManager = () => {
           <p className="text-sm text-slate-600">Upload, manage, and organize dealer files</p>
         </div>
       </header>
-      
+
       <main className="flex-1 overflow-auto p-6 space-y-6">
         {/* File Upload Section */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
           <FileUpload />
         </motion.div>
 
         {/* File Browser */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-        >
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
           <Card className="shadow-lg border-slate-200">
             <CardHeader className="bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200">
               <div className="flex items-center justify-between">
@@ -166,9 +146,9 @@ const FileManager = () => {
                 </div>
               ) : (
                 <div className="divide-y divide-slate-100">
-                  {filteredFiles.map((file, index) => (
+                  {currentFiles.map((file, index) => (
                     <motion.div
-                      key={file.id}
+                      key={file.fileName + index}
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: index * 0.05 }}
@@ -176,34 +156,34 @@ const FileManager = () => {
                     >
                       <div className="flex items-center gap-4">
                         <div className="p-2 bg-slate-100 rounded-lg">
-                          {file.type === 'folder' ? (
+                          {file.type === 'elips' ? (
                             <Folder className="h-5 w-5 text-blue-600" />
                           ) : (
                             <File className="h-5 w-5 text-slate-600" />
                           )}
                         </div>
                         <div>
-                          <h3 className="font-medium text-slate-800">{file.name}</h3>
+                          <h3 className="font-medium text-slate-800">{file.fileName}</h3>
                           <div className="flex items-center gap-2 text-sm text-slate-500">
-                            <span>{file.path}</span>
+                            <span>{file.type.toUpperCase()}</span>
                             <span>•</span>
-                            <span>{file.modified}</span>
-                            {file.size && (
+                            <span>{file.sended ? 'Sent' : 'Not Sent'}</span>
+                            {file.fileSizeMb && (
                               <>
                                 <span>•</span>
-                                <span>{formatFileSize(file.size)}</span>
+                                <span>{formatFileSize(Number(file.fileSizeMb))}</span>
                               </>
                             )}
                           </div>
                         </div>
                       </div>
-                      
+
                       <div className="flex items-center gap-3">
                         <Badge variant="outline" className="flex items-center gap-1">
                           <Server className="h-3 w-3" />
                           {getDealerName(file.dealerId)}
                         </Badge>
-                        
+
                         <div className="flex items-center gap-1">
                           <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
                             <Eye className="h-4 w-4" />
@@ -223,23 +203,34 @@ const FileManager = () => {
                   ))}
                 </div>
               )}
+
+              {/* Controles de paginación */}
+              {totalPages > 1 && (
+                <div className="flex justify-center items-center gap-4 py-4">
+                  <Button onClick={goToPreviousPage} disabled={currentPage === 1} variant="outline">
+                    Prev
+                  </Button>
+                  <span>
+                    Página {currentPage} de {totalPages}
+                  </span>
+                  <Button onClick={goToNextPage} disabled={currentPage === totalPages} variant="outline">
+                    Next
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         </motion.div>
 
-        {/* Storage Usage */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-        >
+        {/* Storage Usage (sin cambios) */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-blue-700">Total Files</p>
-                    <p className="text-2xl font-bold text-blue-800">{files.length}</p>
+                    <p className="text-2xl font-bold text-blue-800">{filteredFiles.length}</p>
                   </div>
                   <File className="h-8 w-8 text-blue-600" />
                 </div>
@@ -251,7 +242,7 @@ const FileManager = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-green-700">Storage Used</p>
-                    <p className="text-2xl font-bold text-green-800">2.4 GB</p>
+                    <p className="text-2xl font-bold text-green-800">{totalSizeFormatted} GB</p>
                   </div>
                   <FolderOpen className="h-8 w-8 text-green-600" />
                 </div>
@@ -263,7 +254,7 @@ const FileManager = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-purple-700">Recent Uploads</p>
-                    <p className="text-2xl font-bold text-purple-800">12</p>
+                    <p className="text-2xl font-bold text-purple-800">{recentUploadsCount}</p>
                   </div>
                   <Upload className="h-8 w-8 text-purple-600" />
                 </div>

@@ -18,7 +18,7 @@ const Settings = () => {
           <p className="text-sm text-slate-600">Configure your monitoring preferences</p>
         </div>
       </header>
-      
+
       <main className="flex-1 overflow-auto p-6 space-y-6">
         <div className="max-w-4xl mx-auto space-y-6">
           {/* Notification Settings */}
@@ -37,23 +37,23 @@ const Settings = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <Label className="text-base font-medium">Email Alerts</Label>
-                    <p className="text-sm text-slate-600">Receive email notifications for server issues</p>
+                    <p className="text-sm text-slate-600">Receive email notifications for issues</p>
                   </div>
                   <Switch defaultChecked />
                 </div>
-                
+
                 <div className="flex items-center justify-between">
                   <div>
-                    <Label className="text-base font-medium">SMS Alerts</Label>
-                    <p className="text-sm text-slate-600">Get SMS notifications for critical issues</p>
+                    <Label className="text-base font-medium">Whatsapp Alerts</Label>
+                    <p className="text-sm text-slate-600">Get Whatsapp notifications for critical issues</p>
                   </div>
                   <Switch />
                 </div>
-                
+
                 <div className="flex items-center justify-between">
                   <div>
-                    <Label className="text-base font-medium">Slack Integration</Label>
-                    <p className="text-sm text-slate-600">Send alerts to your Slack workspace</p>
+                    <Label className="text-base font-medium">Teams Integration</Label>
+                    <p className="text-sm text-slate-600">Send alerts to your Teams channel</p>
                   </div>
                   <Switch defaultChecked />
                 </div>
@@ -77,20 +77,12 @@ const Settings = () => {
               <CardContent className="p-6 space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="cpu-threshold">CPU Usage Threshold (%)</Label>
+                    <Label htmlFor="cpu-threshold">Without Generating (hour)</Label>
                     <Input id="cpu-threshold" type="number" defaultValue="80" className="mt-1" />
                   </div>
                   <div>
-                    <Label htmlFor="memory-threshold">Memory Usage Threshold (%)</Label>
+                    <Label htmlFor="memory-threshold">Without Sending (hour)</Label>
                     <Input id="memory-threshold" type="number" defaultValue="85" className="mt-1" />
-                  </div>
-                  <div>
-                    <Label htmlFor="disk-threshold">Disk Usage Threshold (%)</Label>
-                    <Input id="disk-threshold" type="number" defaultValue="90" className="mt-1" />
-                  </div>
-                  <div>
-                    <Label htmlFor="response-threshold">Response Time Threshold (ms)</Label>
-                    <Input id="response-threshold" type="number" defaultValue="1000" className="mt-1" />
                   </div>
                 </div>
               </CardContent>
@@ -121,11 +113,18 @@ const Settings = () => {
                     <Input id="timeout" type="number" defaultValue="30" className="mt-1" />
                   </div>
                 </div>
-                
+
                 <div className="flex items-center justify-between">
                   <div>
-                    <Label className="text-base font-medium">Auto-restart Failed Services</Label>
-                    <p className="text-sm text-slate-600">Automatically attempt to restart failed services</p>
+                    <Label className="text-base font-medium">Auto-Gen Failed Files</Label>
+                    <p className="text-sm text-slate-600">Automatically attempt to regenerate failed files</p>
+                  </div>
+                  <Switch />
+                </div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="text-base font-medium">Auto-Send Failed Files</Label>
+                    <p className="text-sm text-slate-600">Automatically attempt to send failed files</p>
                   </div>
                   <Switch />
                 </div>

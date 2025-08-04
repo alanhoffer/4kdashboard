@@ -11,6 +11,8 @@ import FileManager from "@/pages/FileManager";
 import Analytics from "@/pages/Analytics";
 import Settings from "@/pages/Settings";
 import NotFound from "@/pages/NotFound";
+import { useDealersWithFiles } from "./hooks/useDealersWithFiles";
+import { DealerProvider } from "./context/DealerContext";
 
 const queryClient = new QueryClient();
 
@@ -19,23 +21,25 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <BrowserRouter>
-          <SidebarProvider>
-            <div className="flex min-h-screen w-full bg-slate-50">
-              <AppSidebar />
-              <SidebarInset className="flex-1 w-full min-w-0">
-                <Toaster />
-                <Sonner />
-                <Routes>
-                  <Route path="/" element={<Index />} />
-                  <Route path="/dealer/:id" element={<ServerDetails />} />
-                  <Route path="/files" element={<FileManager />} />
-                  <Route path="/analytics" element={<Analytics />} />
-                  <Route path="/settings" element={<Settings />} />
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
-              </SidebarInset>
-            </div>
-          </SidebarProvider>
+          <DealerProvider> {/* <-- envolvés acá */}
+            <SidebarProvider>
+              <div className="flex min-h-screen w-full bg-slate-50">
+                <AppSidebar />
+                <SidebarInset className="flex-1 w-full min-w-0">
+                  <Toaster />
+                  <Sonner />
+                  <Routes>
+                    <Route path="/" element={<Index />} />
+                    <Route path="/dealer/:id" element={<ServerDetails />} />
+                    <Route path="/files" element={<FileManager />} />
+                    <Route path="/analytics" element={<Analytics />} />
+                    <Route path="/settings" element={<Settings />} />
+                    <Route path="*" element={<NotFound />} />
+                  </Routes>
+                </SidebarInset>
+              </div>
+            </SidebarProvider>
+          </DealerProvider>
         </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>

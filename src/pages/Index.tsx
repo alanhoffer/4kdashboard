@@ -1,4 +1,4 @@
-import React from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,19 +18,31 @@ import {
   Globe,
   FileText
 } from 'lucide-react';
-import { dealers } from '../data/dealers';
 import FileStatus from '../components/FileStatus';
-import { useDealersWithFiles } from '@/hooks/useDealersWithFiles';
+import ProgressFake from '@/components/ui/progress-fake';
+import { useDealerContext } from '@/context/DealerContext';
 
 const Index = () => {
-  const dealers = useDealersWithFiles();
+  const { dealers, loading } = useDealerContext();
+  const [showContent, setShowContent] = useState(false);
+
+  useEffect(() => {
+    if (!loading) {
+      // Si la carga terminó, dejar que el ProgressFake termine y luego mostrar
+      const timeout = setTimeout(() => {
+        setShowContent(true);
+      }, 3000); // si querés dejar que se vea el progreso al 100% antes de mostrar
+      return () => clearTimeout(timeout);
+    }
+  }, [loading]);
+
   console.log('Dealers with files:', dealers);
 
-  const allFiles = dealers.flatMap(d => d.files);
+  const allFiles = dealers.flatMap(d => d.fileSettings);
   const totalFiles = allFiles.filter(f => f.status !== 'disabled').length;
   const sentFiles = allFiles.filter(f => f.status === 'sent').length;
-  const pendingFiles = allFiles.filter(f => f.status === 'pending').length;
-  const failedFiles = allFiles.filter(f => f.status === 'failed').length;
+  const generatedFiles = allFiles.filter(f => f.status === 'generated').length;
+  const errorFiles = allFiles.filter(f => f.status === 'error').length;
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -48,6 +60,13 @@ const Index = () => {
     }
   };
 
+  if (!showContent) {
+    return (
+      <div className="flex justify-center items-center h-full w-full">
+        <ProgressFake loading={loading} onFinish={() => setShowContent(true)} />
+      </div>
+    );
+  }
   return (
     <div className="flex flex-col h-full w-full">
       <header className="flex items-center sticky top-0 z-10 gap-4 border-b border-slate-200 bg-white backdrop-blur-sm px-6 py-4">
@@ -89,7 +108,7 @@ const Index = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-yellow-700">Generados</p>
-                    <p className="text-2xl font-bold text-yellow-800">{pendingFiles}</p>
+                    <p className="text-2xl font-bold text-yellow-800">{generatedFiles}</p>
                   </div>
                   <AlertTriangle className="h-8 w-8 text-yellow-600" />
                 </div>
@@ -107,7 +126,7 @@ const Index = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-red-700">Error</p>
-                    <p className="text-2xl font-bold text-red-800">{failedFiles}</p>
+                    <p className="text-2xl font-bold text-red-800">{errorFiles}</p>
                   </div>
                   <XCircle className="h-8 w-8 text-red-600" />
                 </div>
@@ -139,7 +158,7 @@ const Index = () => {
           <CardHeader className="bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200">
             <CardTitle className="flex items-center gap-2">
               <Activity className="h-5 w-5 text-blue-600" />
-              Server Status
+              Dealer Status
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
@@ -194,10 +213,10 @@ const Index = () => {
                       <div className="flex items-start gap-3 pl-14">
                         <div className="flex items-center gap-2 text-sm text-slate-600 min-w-0">
                           <FileText className="h-4 w-4 text-slate-500 flex-shrink-0" />
-                          <span className="font-medium">Files:</span>
+                          <span className="font-medium">Archivos:</span>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <FileStatus files={dealer.files} />
+                          <FileStatus files={dealer.files} fileSettings={dealer.fileSettings} />
                         </div>
                       </div>
                     </div>

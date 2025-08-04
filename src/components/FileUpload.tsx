@@ -5,17 +5,18 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { 
-  Upload, 
-  File, 
-  X, 
-  CheckCircle, 
+import axios from 'axios';
+import {
+  Upload,
+  File,
+  X,
+  CheckCircle,
   AlertCircle,
   Server,
   FolderOpen
 } from 'lucide-react';
-import { dealers } from '../data/dealers';
 import { useToast } from '../hooks/use-toast';
+import { useDealerContext } from '@/context/DealerContext';
 
 interface UploadFile {
   id: string;
@@ -26,13 +27,15 @@ interface UploadFile {
 }
 
 const FileUpload = () => {
+
+  const { dealers, loading } = useDealerContext();
+
   const [selectedDealer, setSelectedDealer] = useState<string>('');
   const [uploadFiles, setUploadFiles] = useState<UploadFile[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const { toast } = useToast();
 
   const onlineDealers = dealers.filter(dealer => dealer.status === 'Active');
-
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
     addFiles(files);
@@ -69,38 +72,67 @@ const FileUpload = () => {
       return;
     }
 
-    const dealer = dealers.find(s => s.id === selectedDealer);
-    
-    setUploadFiles(prev => prev.map(f => 
-      f.id === fileId 
-        ? { ...f, status: 'uploading', dealerId: selectedDealer }
+    const fileToUpload = uploadFiles.find(f => f.id === fileId);
+    if (!fileToUpload) return;
+
+    setUploadFiles(prev => prev.map(f =>
+      f.id === fileId
+        ? { ...f, status: 'uploading', progress: 0 }
         : f
     ));
 
-    // Simulate upload progress
-    for (let progress = 0; progress <= 100; progress += 10) {
-      await new Promise(resolve => setTimeout(resolve, 200));
-      setUploadFiles(prev => prev.map(f => 
-        f.id === fileId ? { ...f, progress } : f
+    // Obtener el dealer seleccionado completo para tomar clientId
+    const dealer = dealers.find(d => d.id === selectedDealer);
+    if (!dealer) return;
+
+    // Crear FormData para enviar
+    const formData = new FormData();
+    formData.append('file', fileToUpload.file);
+    formData.append('clientId', dealer.clientId || '');
+
+    try {
+      const response = await axios.post('http://apitoolbackend.ddns.net:5000/api/upload', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+        onUploadProgress: (progressEvent) => {
+          const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          setUploadFiles(prev => prev.map(f =>
+            f.id === fileId ? { ...f, progress } : f
+          ));
+        }
+      });
+
+      if (response.data.success) {
+        setUploadFiles(prev => prev.map(f =>
+          f.id === fileId ? { ...f, status: 'completed', progress: 100 } : f
+        ));
+        toast({
+          title: "Upload successful",
+          description: `File uploaded to ${dealer.name}`,
+          variant: "default"
+        });
+      } else {
+        setUploadFiles(prev => prev.map(f =>
+          f.id === fileId ? { ...f, status: 'error', progress: 0 } : f
+        ));
+        toast({
+          title: "Upload failed",
+          description: response.data.message || "Unknown error during upload.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      setUploadFiles(prev => prev.map(f =>
+        f.id === fileId ? { ...f, status: 'error', progress: 0 } : f
       ));
+      toast({
+        title: "Upload error",
+        description: "Network or server error. Please try again.",
+        variant: "destructive"
+      });
+      console.error('Upload error:', error);
     }
-
-    // Randomly simulate success or error
-    const isSuccess = Math.random() > 0.2;
-    
-    setUploadFiles(prev => prev.map(f => 
-      f.id === fileId 
-        ? { ...f, status: isSuccess ? 'completed' : 'error', progress: isSuccess ? 100 : 0 }
-        : f
-    ));
-
-    toast({
-      title: isSuccess ? "Upload successful" : "Upload failed",
-      description: isSuccess 
-        ? `File uploaded to ${dealer?.name}` 
-        : "There was an error uploading the file. Please try again.",
-      variant: isSuccess ? "default" : "destructive"
-    });
   };
 
   const uploadAllFiles = () => {
@@ -109,6 +141,7 @@ const FileUpload = () => {
       simulateUpload(file.id);
     });
   };
+
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -170,11 +203,10 @@ const FileUpload = () => {
 
         {/* File Drop Zone */}
         <div
-          className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-            isDragOver 
-              ? 'border-indigo-400 bg-indigo-50' 
-              : 'border-slate-300 hover:border-slate-400'
-          }`}
+          className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${isDragOver
+            ? 'border-indigo-400 bg-indigo-50'
+            : 'border-slate-300 hover:border-slate-400'
+            }`}
           onDragOver={(e) => {
             e.preventDefault();
             setIsDragOver(true);
@@ -196,8 +228,8 @@ const FileUpload = () => {
             className="hidden"
             id="file-upload"
           />
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             onClick={() => document.getElementById('file-upload')?.click()}
             className="border-indigo-300 text-indigo-600 hover:bg-indigo-50"
           >
@@ -241,7 +273,7 @@ const FileUpload = () => {
                   className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg border"
                 >
                   {getStatusIcon(uploadFile.status)}
-                  
+
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-1">
                       <p className="text-sm font-medium text-slate-800 truncate">
@@ -258,14 +290,14 @@ const FileUpload = () => {
                         )}
                       </div>
                     </div>
-                    
+
                     <div className="flex items-center justify-between text-xs text-slate-500">
                       <span>{formatFileSize(uploadFile.file.size)}</span>
                       {uploadFile.status === 'uploading' && (
                         <span>{uploadFile.progress}%</span>
                       )}
                     </div>
-                    
+
                     {uploadFile.status === 'uploading' && (
                       <Progress value={uploadFile.progress} className="h-1 mt-2" />
                     )}

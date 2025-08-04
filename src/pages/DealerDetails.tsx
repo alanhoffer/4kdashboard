@@ -6,23 +6,27 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
-import { 
-  ArrowLeft, 
-  Server, 
-  Cpu, 
-  HardDrive, 
-  Wifi, 
+import {
+  ArrowLeft,
+  Server,
+  Cpu,
+  HardDrive,
+  Wifi,
   Activity,
   Clock,
   Users,
   Database
 } from 'lucide-react';
-import { dealers } from '../data/dealers';
+import { format } from 'date-fns';
 import FileManagement from '../components/FileManagement';
+import { useDealerContext } from '@/context/DealerContext';
+import ProgressFake from '@/components/ui/progress-fake';
 
 const DealerDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { dealers, loading } = useDealerContext();
+
   const dealer = dealers.find(s => s.id === id);
 
   if (!dealer) {
@@ -42,8 +46,17 @@ const DealerDetails = () => {
     );
   }
 
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-full w-full">
+        {/* Podés usar un spinner o una barra de progreso */}
+        <ProgressFake />
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col h-full w-full">
+    <div className="flex flex-col h-full w-full ">
       <header className="flex items-center sticky top-0 z-10 gap-4 border-b border-slate-200 bg-white px-6 py-4">
         <SidebarTrigger />
         <Button
@@ -56,12 +69,12 @@ const DealerDetails = () => {
           Back
         </Button>
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">{dealer.name}</h1>
+          <h1 className="text-2xl font-bold text-slate-800 ">{dealer.name}</h1>
           <p className="text-sm text-slate-600">{dealer.dealerId} • {dealer.location}</p>
         </div>
       </header>
-      
-      <main className="flex-1 overflow-auto p-6 space-y-6">
+
+      <main className="flex-1 overflow-auto p-6 space-y-6 ">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Dealer Info */}
           <motion.div
@@ -69,7 +82,7 @@ const DealerDetails = () => {
             animate={{ opacity: 1, y: 0 }}
             className="lg:col-span-2"
           >
-            <Card className="shadow-lg">
+            <Card className="shadow-lg border-slate-200">
               <CardHeader className="bg-gradient-to-r from-blue-50 to-purple-50 border-b border-slate-200">
                 <CardTitle className="flex items-center gap-2">
                   <Server className="h-5 w-5 text-blue-600" />
@@ -90,7 +103,7 @@ const DealerDetails = () => {
                           <span className="text-sm text-slate-600">{dealer.server}</span>
                         </div>
                       </div>
-                      
+
                       <div>
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2">
@@ -100,7 +113,7 @@ const DealerDetails = () => {
                           <span className="text-sm text-slate-600">{dealer.sapSystem}</span>
                         </div>
                       </div>
-                      
+
                       <div>
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2">
@@ -112,7 +125,7 @@ const DealerDetails = () => {
                       </div>
                     </div>
                   </div>
-                  
+
                   <div>
                     <h3 className="font-semibold text-slate-700 mb-3">Contacts Details</h3>
                     <div className="space-y-3">
@@ -135,8 +148,8 @@ const DealerDetails = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
           >
-            <Card className="shadow-lg ">
-              <CardHeader className="bg-gradient-to-r from-green-50 to-blue-50">
+            <Card className="shadow-lg  border-slate-200">
+              <CardHeader className="bg-gradient-to-r from-green-50 to-blue-50 border-b border-slate-200">
                 <CardTitle className="flex items-center gap-2">
                   <Activity className="h-5 w-5 text-green-600" />
                   Last File
@@ -144,27 +157,30 @@ const DealerDetails = () => {
               </CardHeader>
               <CardContent className="p-6">
                 <div className="text-center space-y-4">
-                  <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full ${
-                    dealer.server === 'Fabric' ? 'bg-green-100 text-green-800' :
+                  <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full ${dealer.server === 'Fabric' ? 'bg-green-100 text-green-800' :
                     dealer.server === 'Agent' ? 'bg-white text-yellow-600 border border-yellow-200' :
-                    'bg-red-100 text-red-800'
-                  }`}>
-                    <div className={`w-2 h-2 rounded-full ${
-                      dealer.server === 'Fabric' ? 'bg-green-500' :
+                      'bg-red-100 text-red-800'
+                    }`}>
+                    <div className={`w-2 h-2 rounded-full ${dealer.server === 'Fabric' ? 'bg-green-500' :
                       dealer.server === 'Agent' ? 'bg-yellow-500' :
-                      'bg-red-500'
-                    }`} />
-                    <span className="font-medium capitalize">{dealer.files[0]?.name}</span>
+                        'bg-red-500'
+                      }`} />
+                    <span className="font-medium capitalize">{dealer.files[0]?.fileName}</span>
                   </div>
-                  
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-slate-600">Response Time:</span>
-                      <span className="text-sm font-medium">{dealer.files[0]?.lastSent}</span>
+                      <span className="text-sm font-medium">
+                        {dealer?.files[0]?.shipmentDatetime
+                          ? format(new Date(dealer.files[0].shipmentDatetime), 'dd/MM/yyyy HH:mm')
+                          : 'Fecha no disponible'}
+                      </span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-slate-600">Last Check:</span>
-                      <span className="text-sm font-medium">{dealer.files[0]?.status}</span>
+                      <span className="text-sm font-medium">
+                        {format(new Date(), 'dd/MM/yyyy HH:mm')}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -179,11 +195,12 @@ const DealerDetails = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
         >
-          <FileManagement 
-            files={dealer.files} 
-            dealerId={dealer.id} 
+          <FileManagement
+            files={dealer.fileSettings}
+            dealerId={dealer.id}
             dealerName={dealer.name}
           />
+
         </motion.div>
       </main>
     </div>
