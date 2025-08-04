@@ -72,8 +72,8 @@ const Index = () => {
       <header className="flex items-center sticky top-0 z-10 gap-4 border-b border-slate-200 bg-white backdrop-blur-sm px-6 py-4">
         <SidebarTrigger />
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">Resumen del dealer</h1>
-          <p className="text-sm text-slate-600">Supervisa la información de tu dealer en tiempo real</p>
+          <h1 className="text-2xl font-bold text-slate-800">Dealer Overview</h1>
+          <p className="text-sm text-slate-600">View dealer information in real-time</p>
         </div>
       </header>
 
@@ -89,7 +89,7 @@ const Index = () => {
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-green-700">Enviados</p>
+                    <p className="text-sm font-medium text-green-700">Sent</p>
                     <p className="text-2xl font-bold text-green-800">{sentFiles}</p>
                   </div>
                   <CheckCircle className="h-8 w-8 text-green-600" />
@@ -107,7 +107,7 @@ const Index = () => {
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-yellow-700">Generados</p>
+                    <p className="text-sm font-medium text-yellow-700">Generated</p>
                     <p className="text-2xl font-bold text-yellow-800">{generatedFiles}</p>
                   </div>
                   <AlertTriangle className="h-8 w-8 text-yellow-600" />
