@@ -59,7 +59,7 @@ export function AppSidebar() {
   }, []);
 
   const menuItems = [
-    { title: 'Server Overview', icon: Server, href: '/' },
+    { title: 'Dealer Overview', icon: Server, href: '/' },
     { title: 'File Manager', icon: FolderOpen, href: '/files' },
     { title: 'Transform Data', icon: FileSpreadsheet, href: '/transform' },
     { title: 'Manage Dealers', icon: Edit, href: '/manage-dealers' },
