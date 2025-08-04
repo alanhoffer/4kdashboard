@@ -63,8 +63,7 @@ export function AppSidebar() {
     { title: 'File Manager', icon: FolderOpen, href: '/files' },
     { title: 'Analytics', icon: BarChart3, href: '/analytic' },
     { title: 'Transform Data', icon: FileSpreadsheet, href: '/transform' },
-    { title: 'Manage Servers', icon: Edit, href: '/manage-servers' },
-    { title: 'Tools', icon: Hammer, href: '/tools' },
+    { title: 'Manage Dealers', icon: Edit, href: '/manage-dealers' },
     { title: 'Settings', icon: Settings, href: '/settings' },
   ];
 
