@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { SidebarTrigger } from '@/components/ui/sidebar';
@@ -26,6 +26,17 @@ const DealerDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { dealers, loading } = useDealerContext();
+  const [showContent, setShowContent] = useState(false);
+
+  useEffect(() => {
+    if (!loading) {
+      // Si la carga terminó, dejar que el ProgressFake termine y luego mostrar
+      const timeout = setTimeout(() => {
+        setShowContent(true);
+      }, 3000); // si querés dejar que se vea el progreso al 100% antes de mostrar
+      return () => clearTimeout(timeout);
+    }
+  }, [loading]);
 
   const dealer = dealers.find(s => s.id === id);
 
@@ -46,11 +57,10 @@ const DealerDetails = () => {
     );
   }
 
-  if (loading) {
+  if (!showContent) {
     return (
       <div className="flex justify-center items-center h-full w-full">
-        {/* Podés usar un spinner o una barra de progreso */}
-        <ProgressFake />
+        <ProgressFake loading={loading} onFinish={() => setShowContent(true)} />
       </div>
     );
   }
