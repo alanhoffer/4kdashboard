@@ -91,7 +91,7 @@ const FileUpload = () => {
     formData.append('clientId', dealer.clientId || '');
 
     try {
-      const response = await axios.post('http://apitoolbackend.ddns.net:5000/api/upload', formData, {
+      const response = await axios.post('http://4k.cabañahoffer.com.ar/api/upload', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
