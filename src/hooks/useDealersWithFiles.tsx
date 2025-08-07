@@ -22,7 +22,7 @@ export function useDealersWithFiles() {
   useEffect(() => {
     async function fetchFileType(dealerId: string, type: string): Promise<ExtendedDealerFile[]> {
       try {
-        const res = await axios.get(`http://apitoolbackend.ddns.net:3000/dealers/${dealerId}/logs/${type}`);
+        const res = await axios.get(`https://4k.xn--cabaahoffer-4db.com.ar/dealers/${dealerId}/logs/${type}`);
 
         const rows = res.data?.rows;
 

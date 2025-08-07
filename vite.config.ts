@@ -8,7 +8,7 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     port: 5000,
-    allowedHosts: ['apitoolbackend.ddns.net'],
+    allowedHosts: ['apitoolbackend.ddns.net', '4k.xn--cabaahoffer-4db.com.ar', 'xn--cabaahoffer-4db.com.ar'],
   },
   optimizeDeps: {
     exclude: ["lucide-react"],
