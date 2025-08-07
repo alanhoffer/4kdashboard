@@ -19,12 +19,13 @@ export function AppSidebar() {
 
   // Estado para tema, inicializa según clase en html o preferencia del sistema
   const [isDark, setIsDark] = useState(() => {
-    if (typeof window !== 'undefined') {
-      if (document.documentElement.classList.contains('dark')) return true;
-      return window.matchMedia('(prefers-color-scheme: dark)').matches;
-    }
+    // if (typeof window !== 'undefined') {
+    //   if (document.documentElement.classList.contains('dark')) return true;
+    //   return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    // }
     return false;
   });
+
 
   // Cambia clase dark en html y guarda preferencia
   const toggleDarkMode = () => {
