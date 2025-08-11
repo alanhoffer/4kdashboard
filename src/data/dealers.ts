@@ -293,7 +293,7 @@ export const dealers: Dealer[] = [
       {
         name: 'ELIPS',
         type: 'elips',
-        enabled: true,
+        enabled: false,
         status: '',
         lastSent: ''
       },
