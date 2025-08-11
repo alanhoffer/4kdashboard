@@ -428,7 +428,7 @@ export const dealers: Dealer[] = [
       {
         name: 'ELIPS',
         type: 'elips',
-        enabled: false,
+        enabled: true,
         status: '',
         lastSent: ''
       },
