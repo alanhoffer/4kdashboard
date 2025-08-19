@@ -91,7 +91,7 @@ const FileUpload = () => {
     formData.append('clientId', dealer.clientId || '');
 
     try {
-      const response = await axios.post('https://4k.xn--cabaahoffer-4db.com.ar/api/upload', formData, {
+      const response = await axios.post('https://4k.xn--cabaahoffer-4db.com.ar/dtf/upload', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
