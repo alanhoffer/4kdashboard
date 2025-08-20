@@ -23,7 +23,7 @@ export function useDealersWithFiles() {
     async function fetchFileType(dealerId: string, type: string): Promise<ExtendedDealerFile[]> {
       try {
         const res = await axios.get(`https://4k.xn--cabaahoffer-4db.com.ar/dealers/${dealerId}/logs/${type}`);
-
+        console.log(`Fetched ${type} files for dealer ${dealerId}`, res.data);
         const rows = res.data?.rows;
 
         if (!Array.isArray(rows) || rows.length === 0) {
