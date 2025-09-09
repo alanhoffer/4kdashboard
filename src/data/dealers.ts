@@ -417,7 +417,7 @@ export const dealers: Dealer[] = [
     dealerId: '2L1562',
     clientId: 'SALFA',
     server: 'Fabric',
-    status: 'Inactive',
+    status: 'Active',
     dbArchitecture: 'MYSQL',
     sapSystem: 'SAP HANA',
     contacts: [
