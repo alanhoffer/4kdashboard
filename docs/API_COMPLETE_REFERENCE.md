@@ -1,902 +1,522 @@
-# API Completa - Documentación para Frontend
+# Documentación de Endpoints de Envío de Archivos
 
-## Base URL
-```
-https://fourk-api.icyrock-7ac226d0.brazilsouth.azurecontainerapps.io
-```
+Esta documentación describe cómo usar los endpoints para enviar archivos directamente a servicios externos (John Deere y Seedz) a través del backend.
+
+## Tabla de Contenidos
+
+- [Autenticación](#autenticación)
+- [Endpoints ELIPS (John Deere)](#endpoints-elips-john-deere)
+- [Endpoints RPM (John Deere)](#endpoints-rpm-john-deere)
+- [Endpoints SEEDZ](#endpoints-seedz)
+- [Manejo de Errores](#manejo-de-errores)
+- [Ejemplos de Código](#ejemplos-de-código)
+
+---
 
 ## Autenticación
-La mayoría de endpoints requieren autenticación Bearer Token:
+
+Todos los endpoints requieren autenticación mediante **Bearer Token** (OAuth2).
+
+**Header requerido:**
 ```
-Authorization: Bearer <access_token>
+Authorization: Bearer {tu_token_de_acceso}
 ```
+
+**Permisos necesarios:**
+- Para endpoints ELIPS: Permisos de aplicación **ELIPS**
+- Para endpoints RPM: Permisos de aplicación **RPM**
+- Para endpoints SEEDZ: Permisos de aplicación **SEEDZ**
 
 ---
 
-## 🔐 Autenticación (`/auth`)
+## Endpoints ELIPS (John Deere)
 
-### POST `/auth/login`
-Inicia sesión y obtiene tokens de acceso.
+### Enviar archivo ELIPS a John Deere
 
-**Request Body:**
-```json
-{
-  "email": "admin@cliente.com",
-  "password": "password123"
-}
-```
+**Endpoint:** `POST /elips/send-to-johndeere`
 
-**Response (200 OK):**
-```json
-{
-  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "token_type": "bearer"
-}
-```
+**Descripción:** Envía un archivo ELIPS (JSON o XML) directamente a John Deere sin guardarlo en Blob Storage.
 
-**Ejemplo cURL:**
-```bash
-curl -X POST "https://fourk-api.icyrock-7ac226d0.brazilsouth.azurecontainerapps.io/auth/login" \
-  -H "Content-Type: application/json" \
-  -d '{"email": "admin@cliente.com", "password": "password123"}'
-```
+**Parámetros:**
+- `file` (FormData, requerido): Archivo a enviar (debe ser `.json` o `.xml`)
+- `target_client_id` (FormData, opcional): ID del cliente objetivo (solo para superadmins)
 
----
+**Ejemplo de uso (JavaScript/Fetch):**
 
-### POST `/auth/refresh`
-Renueva el token de acceso usando el refresh token.
-
-**Request Body:**
-```json
-{
-  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-}
-```
-
-**Response (200 OK):**
-```json
-{
-  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "token_type": "bearer"
-}
-```
-
----
-
-### GET `/auth/me`
-Obtiene información del usuario autenticado.
-
-**Headers:**
-```
-Authorization: Bearer <access_token>
-```
-
-**Response (200 OK):**
-```json
-{
-  "user_id": "uuid-del-usuario",
-  "email": "admin@cliente.com",
-  "client_id": 7,
-  "client_name": "NIBOL",
-  "dealer_name": "NIBOL",
-  "role": "admin",
-  "global_role": "user"
-}
-```
-
-**Roles posibles:**
-- `global_role`: `"superadmin"` | `"user"`
-- `role`: `"admin"` | `"user"`
-
----
-
-### GET `/auth/apps`
-Obtiene las aplicaciones disponibles para el usuario actual.
-
-**Headers:**
-```
-Authorization: Bearer <access_token>
-```
-
-**Response (200 OK):**
-```json
-{
-  "user_id": "uuid-del-usuario",
-  "email": "admin@cliente.com",
-  "client_id": "7",
-  "global_role": "user",
-  "available_apps": [
-    {
-      "application_id": "1",
-      "name": "ERP",
-      "description": "Sistema ERP",
-      "role": "user",
-      "access_granted": true
-    },
-    {
-      "application_id": "2",
-      "name": "RPM",
-      "description": "Sistema RPM",
-      "role": "user",
-      "access_granted": true
-    }
-  ],
-  "total_apps": 2
-}
-```
-
----
-
-### POST `/auth/create_superadmin`
-Crea un usuario superadmin (sin autenticación requerida - solo para setup inicial).
-
-**Request Body:**
-```json
-{
-  "email": "superadmin@4k.com",
-  "password": "SuperSecurePassword123!"
-}
-```
-
-**Response (200 OK):**
-```json
-{
-  "superadmin_id": "uuid-generado",
-  "superadmin_email": "superadmin@4k.com"
-}
-```
-
----
-
-### POST `/auth/create_client`
-Crea un nuevo cliente (solo Superadmin).
-
-**Headers:**
-```
-Authorization: Bearer <access_token>
-```
-
-**Request Body:**
-```json
-{
-  "id": 8,
-  "name": "Nuevo Cliente",
-  "contact_email": "contacto@nuevocliente.com"
-}
-```
-
-**Response (200 OK):**
-```json
-{
-  "client_id": 8,
-  "name": "Nuevo Cliente",
-  "contact_email": "contacto@nuevocliente.com",
-  "created_by": "superadmin@4k.com",
-  "erp_permissions": "granted",
-  "message": "Cliente Nuevo Cliente creado exitosamente con permisos ERP"
-}
-```
-
----
-
-### POST `/auth/create_client_user`
-Crea un usuario para un cliente específico.
-
-**Headers:**
-```
-Authorization: Bearer <access_token>
-```
-
-**Permisos:**
-- Superadmin: Puede crear usuarios para cualquier cliente
-- Admin de Cliente: Solo puede crear usuarios para su propio cliente
-
-**Request Body:**
-```json
-{
-  "email": "usuario@cliente.com",
-  "password": "Password123!",
-  "client_id": "7",
-  "role": "admin"
-}
-```
-
-**Response (200 OK):**
-```json
-{
-  "user_id": "uuid-generado",
-  "email": "usuario@cliente.com",
-  "client_id": "7",
-  "role": "admin",
-  "client_name": "NIBOL",
-  "created_by": "superadmin@4k.com",
-  "permissions": "superadmin"
-}
-```
-
----
-
-## 👥 Gestión de Usuarios (`/users`)
-
-### GET `/users`
-Lista usuarios según permisos del usuario autenticado.
-
-**Headers:**
-```
-Authorization: Bearer <access_token>
-```
-
-**Query Parameters:**
-- `client_id` (opcional): Filtrar por cliente (solo superadmin)
-
-**Ejemplos:**
-```bash
-# Superadmin - Ver todos
-GET /users
-
-# Superadmin - Filtrar por cliente
-GET /users?client_id=7
-
-# Admin de Cliente - Solo ve su cliente
-GET /users
-```
-
-**Response (200 OK):**
-```json
-[
-  {
-    "id": "uuid-1",
-    "email": "admin@cliente.com",
-    "client_id": 7,
-    "client_name": "NIBOL",
-    "role": "admin",
-    "global_role": "user",
-    "created_at": "2025-02-04T10:00:00"
-  },
-  {
-    "id": "uuid-2",
-    "email": "usuario@cliente.com",
-    "client_id": 7,
-    "client_name": "NIBOL",
-    "role": "user",
-    "global_role": "user",
-    "created_at": "2025-02-04T11:00:00"
-  }
-]
-```
-
----
-
-### DELETE `/users/{user_id}`
-Elimina un usuario.
-
-**Headers:**
-```
-Authorization: Bearer <access_token>
-```
-
-**Permisos:**
-- Superadmin: Puede eliminar cualquier usuario
-- Admin de Cliente: Solo puede eliminar usuarios de su cliente
-
-**Response (200 OK):**
-```json
-{
-  "message": "Usuario eliminado exitosamente"
-}
-```
-
----
-
-## 🏢 Gestión de Clientes (`/clients`)
-
-### GET `/clients`
-Obtiene la lista de clientes disponibles para el usuario actual.
-
-**Headers:**
-```
-Authorization: Bearer <access_token>
-```
-
-**Response - Superadmin (200 OK):**
-```json
-{
-  "user_role": "superadmin",
-  "available_clients": [
-    {
-      "client_id": 1,
-      "name": "Cliente 1",
-      "dealer_id": "DEALER_001",
-      "server": "rg-sql-server-br.database.windows.net",
-      "database": "rg-sql-db"
-    },
-    {
-      "client_id": 7,
-      "name": "NIBOL",
-      "dealer_id": "DEALER_007",
-      "server": "rg-sql-server-br.database.windows.net",
-      "database": "rg-sql-db"
-    }
-  ],
-  "total_clients": 2
-}
-```
-
-**Response - Usuario Normal (200 OK):**
-```json
-{
-  "user_role": "client_user",
-  "client_id": 7,
-  "name": "NIBOL",
-  "dealer_id": "DEALER_007",
-  "server": "rg-sql-server-br.database.windows.net",
-  "database": "rg-sql-db"
-}
-```
-
----
-
-### GET `/clients/{client_id}`
-Obtiene detalles de un cliente específico.
-
-**Headers:**
-```
-Authorization: Bearer <access_token>
-```
-
-**Response (200 OK):**
-```json
-{
-  "client_id": 7,
-  "name": "NIBOL",
-  "dealer_id": "DEALER_007",
-  "server": "rg-sql-server-br.database.windows.net",
-  "database": "rg-sql-db",
-  "status": "active"
-}
-```
-
----
-
-### GET `/clients/{client_id}/users`
-Obtiene los usuarios de un cliente específico.
-
-**Headers:**
-```
-Authorization: Bearer <access_token>
-```
-
-**Response (200 OK):**
-```json
-[
-  {
-    "id": "uuid-1",
-    "email": "admin@nibol.com",
-    "client_id": 7,
-    "client_name": "NIBOL",
-    "role": "admin",
-    "global_role": "user",
-    "created_at": "2025-02-04T10:00:00"
-  }
-]
-```
-
----
-
-### GET `/clients/{client_id}/apps`
-Obtiene las aplicaciones asignadas a un cliente.
-
-**Headers:**
-```
-Authorization: Bearer <access_token>
-```
-
-**Response (200 OK):**
-```json
-[
-  {
-    "client_id": 7,
-    "application_id": 1,
-    "app_name": "ERP",
-    "status": "active",
-    "created_at": "2025-02-04T10:00:00"
-  },
-  {
-    "client_id": 7,
-    "application_id": 2,
-    "app_name": "RPM",
-    "status": "active",
-    "created_at": "2025-02-04T10:00:00"
-  }
-]
-```
-
----
-
-### POST `/clients/{client_id}/apps`
-Asigna una aplicación a un cliente (Solo Superadmin).
-
-**Headers:**
-```
-Authorization: Bearer <access_token>
-```
-
-**Request Body:**
-```json
-{
-  "client_id": 7,
-  "application_id": 3,
-  "status": "active"
-}
-```
-
-**Response (200 OK):**
-```json
-{
-  "client_id": 7,
-  "application_id": 3,
-  "app_name": "SEEDZ",
-  "status": "active",
-  "created_at": "2025-02-04T12:00:00"
-}
-```
-
----
-
-### DELETE `/clients/{client_id}/apps/{app_id}`
-Remueve una aplicación de un cliente (Solo Superadmin).
-
-**Headers:**
-```
-Authorization: Bearer <access_token>
-```
-
-**Response (200 OK):**
-```json
-{
-  "message": "Aplicación removida exitosamente"
-}
-```
-
----
-
-## 📱 Gestión de Aplicaciones (`/apps`)
-
-### GET `/apps`
-Lista todas las aplicaciones del sistema (Solo Superadmin).
-
-**Headers:**
-```
-Authorization: Bearer <access_token>
-```
-
-**Response (200 OK):**
-```json
-[
-  {
-    "id": 1,
-    "name": "ERP",
-    "description": "Sistema ERP",
-    "created_at": "2025-01-01T00:00:00"
-  },
-  {
-    "id": 2,
-    "name": "RPM",
-    "description": "Sistema RPM",
-    "created_at": "2025-01-01T00:00:00"
-  },
-  {
-    "id": 3,
-    "name": "SEEDZ",
-    "description": "Integración con Seedz",
-    "created_at": "2025-01-15T00:00:00"
-  }
-]
-```
-
----
-
-### POST `/apps`
-Crea una nueva aplicación (Solo Superadmin).
-
-**Headers:**
-```
-Authorization: Bearer <access_token>
-```
-
-**Request Body:**
-```json
-{
-  "name": "NUEVA_APP",
-  "description": "Descripción de la nueva aplicación"
-}
-```
-
-**Response (200 OK):**
-```json
-{
-  "id": 4,
-  "name": "NUEVA_APP",
-  "description": "Descripción de la nueva aplicación",
-  "created_at": "2025-02-04T12:00:00"
-}
-```
-
----
-
-## 📦 Órdenes y Transferencias
-
-### POST `/rpm/orders`
-Sube y procesa un archivo de órdenes (ORD).
-
-**Headers:**
-```
-Authorization: Bearer <access_token>
-```
-
-**Content-Type:** `multipart/form-data`
-
-**Form Data:**
-- `file` (file): Archivo ORD a procesar (.dat, .txt, .ord)
-- `target_client_id` (opcional, int): ID del cliente objetivo (solo superadmin)
-
-**Nota:** 
-- Superadmin DEBE especificar `target_client_id`
-- Usuario normal usa su propio `client_id` automáticamente
-
-**Response (200 OK):**
-```json
-{
-  "success": true,
-  "message": "Successfully processed orders file",
-  "file_type": "orders",
-  "filename": "orders_345923.dat",
-  "client_id": 7,
-  "dealer_name": "NIBOL",
-  "rows_processed": 150,
-  "rows_inserted": 150,
-  "processed_by": "admin@nibol.com",
-  "processed_at": "2025-02-04T12:30:00Z",
-  "endpoint_used": "/erp/rpm/orders"
-}
-```
-
-**Ejemplo cURL:**
-```bash
-curl -X POST "https://fourk-api.icyrock-7ac226d0.brazilsouth.azurecontainerapps.io/rpm/orders" \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -F "file=@orders_345923.dat" \
-  -F "target_client_id=7"
-```
-
----
-
-### POST `/rpm/transfers`
-Sube y procesa un archivo de transferencias (TRF).
-
-**Headers:**
-```
-Authorization: Bearer <access_token>
-```
-
-**Content-Type:** `multipart/form-data`
-
-**Form Data:**
-- `file` (file): Archivo TRF a procesar (.dat, .txt, .trf)
-- `target_client_id` (opcional, int): ID del cliente objetivo (solo superadmin)
-
-**Response (200 OK):**
-```json
-{
-  "success": true,
-  "message": "Successfully processed transfers file",
-  "file_type": "transfers",
-  "filename": "transfers_456789.dat",
-  "client_id": 7,
-  "dealer_name": "NIBOL",
-  "rows_processed": 75,
-  "rows_inserted": 75,
-  "processed_by": "admin@nibol.com",
-  "processed_at": "2025-02-04T12:35:00Z",
-  "endpoint_used": "/erp/rpm/transfers"
-}
-```
-
----
-
-## 📊 Consultar Órdenes y Transferencias Estructuradas (`/prism`)
-
-### GET `/prism/orders`
-Obtiene la lista de cabeceras de órdenes del cliente autenticado.
-
-**Headers:**
-```
-Authorization: Bearer <access_token>
-```
-
-**Response (200 OK):**
-```json
-[
-  {
-    "id": 1,
-    "client_id": 7,
-    "order_id": "345923",
-    "order_date": "2025-02-04T10:30:00",
-    "created_at": "2025-02-04T10:35:00",
-    "processed": false,
-    "is_sent_pd": false
-  },
-  {
-    "id": 2,
-    "client_id": 7,
-    "order_id": "345924",
-    "order_date": "2025-02-04T11:00:00",
-    "created_at": "2025-02-04T11:05:00",
-    "processed": true,
-    "is_sent_pd": false
-  }
-]
-```
-
----
-
-### GET `/prism/orders/{header_id}/items`
-Obtiene todos los ítems de una orden específica.
-
-**Headers:**
-```
-Authorization: Bearer <access_token>
-```
-
-**Response (200 OK):**
-```json
-[
-  {
-    "id": 1,
-    "header_id": 1,
-    "dealer_account": "DEALER001",
-    "dbs_warehouse": "WH001",
-    "order_activity": "ACTIVE",
-    "order_time": "10:30:00",
-    "order_type": "STANDARD",
-    "order_source": "WEB",
-    "order_line_id": "LINE001",
-    "part_number": "PART123",
-    "order_quantity": 10.0,
-    "order_reference_id": "REF001",
-    "special_program_number": null,
-    "requested_ship_date": "2025-02-10",
-    "line_activity": "PENDING",
-    "processed": false
-  }
-]
-```
-
----
-
-### GET `/prism/transfers`
-Obtiene la lista de cabeceras de transferencias del cliente autenticado.
-
-**Headers:**
-```
-Authorization: Bearer <access_token>
-```
-
-**Response (200 OK):**
-```json
-[
-  {
-    "id": 1,
-    "client_id": 7,
-    "transfer_id": "456789",
-    "order_date": "2025-02-04T14:00:00",
-    "created_at": "2025-02-04T14:05:00",
-    "processed": false,
-    "is_sent_pd": false
-  }
-]
-```
-
----
-
-### GET `/prism/transfers/{header_id}/items`
-Obtiene todos los ítems de una transferencia específica.
-
-**Headers:**
-```
-Authorization: Bearer <access_token>
-```
-
-**Response (200 OK):**
-```json
-[
-  {
-    "id": 1,
-    "header_id": 1,
-    "order_time": "14:00:00",
-    "from_dealer_account": "DEALER001",
-    "from_warehouse": "WH001",
-    "to_dealer_account": "DEALER002",
-    "to_warehouse": "WH002",
-    "part_number": "PART789",
-    "transfer_quantity": 20.0,
-    "processed": false
-  }
-]
-```
-
----
-
-## 🔄 Flujo Recomendado para Frontend
-
-### 1. **Login y Autenticación**
 ```javascript
-// 1. Login
-const loginResponse = await fetch('/auth/login', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ email, password })
-});
-const { access_token, refresh_token } = await loginResponse.json();
-
-// 2. Guardar tokens
-localStorage.setItem('access_token', access_token);
-localStorage.setItem('refresh_token', refresh_token);
-
-// 3. Obtener info del usuario
-const userInfo = await fetch('/auth/me', {
-  headers: { 'Authorization': `Bearer ${access_token}` }
-});
-const user = await userInfo.json();
-```
-
-### 2. **Dashboard Superadmin**
-```javascript
-// Listar todos los clientes
-const clients = await fetch('/clients', {
-  headers: { 'Authorization': `Bearer ${access_token}` }
-});
-
-// Listar todas las aplicaciones
-const apps = await fetch('/apps', {
-  headers: { 'Authorization': `Bearer ${access_token}` }
-});
-
-// Listar todos los usuarios
-const users = await fetch('/users', {
-  headers: { 'Authorization': `Bearer ${access_token}` }
-});
-```
-
-### 3. **Crear Cliente y Usuario Admin**
-```javascript
-// 1. Crear cliente
-const newClient = await fetch('/auth/create_client', {
-  method: 'POST',
-  headers: {
-    'Authorization': `Bearer ${access_token}`,
-    'Content-Type': 'application/json'
-  },
-  body: JSON.stringify({
-    id: 8,
-    name: "Nuevo Cliente",
-    contact_email: "contacto@cliente.com"
-  })
-});
-
-// 2. Crear usuario admin para ese cliente
-const adminUser = await fetch('/auth/create_client_user', {
-  method: 'POST',
-  headers: {
-    'Authorization': `Bearer ${access_token}`,
-    'Content-Type': 'application/json'
-  },
-  body: JSON.stringify({
-    email: "admin@nuevocliente.com",
-    password: "Password123!",
-    client_id: "8",
-    role: "admin"
-  })
-});
-```
-
-### 4. **Subir Archivos de Órdenes/Transferencias**
-```javascript
-// Subir archivo ORD
 const formData = new FormData();
 formData.append('file', fileInput.files[0]);
-formData.append('target_client_id', '7'); // Solo si eres superadmin
+// Opcional para admins:
+// formData.append('target_client_id', '7');
 
-const result = await fetch('/rpm/orders', {
+const response = await fetch('/elips/send-to-johndeere', {
   method: 'POST',
   headers: {
-    'Authorization': `Bearer ${access_token}`
+    'Authorization': `Bearer ${accessToken}`
   },
   body: formData
 });
 
-// Subir archivo TRF
-const formData2 = new FormData();
-formData2.append('file', fileInput.files[0]);
-formData2.append('target_client_id', '7');
+const result = await response.json();
+```
 
-const result2 = await fetch('/rpm/transfers', {
+**Respuesta exitosa (200):**
+```json
+{
+  "success": true,
+  "message": "Archivo ELIPS (json) enviado exitosamente a John Deere",
+  "filename": "archivo.json",
+  "client_id": 7,
+  "file_type": "delta",
+  "file_format": "json",
+  "john_deere_response": "OK",
+  "sent_at": "2024-01-15T10:30:00Z",
+  "processed_by": "usuario@ejemplo.com"
+}
+```
+
+**Errores comunes:**
+- `400`: Extensión de archivo incorrecta (debe ser .json o .xml)
+- `403`: Usuario sin permisos ELIPS o intento de especificar target_client_id sin ser admin
+- `404`: No se encontraron credenciales de John Deere para el cliente
+- `500`: Error al enviar el archivo a John Deere
+
+---
+
+## Endpoints RPM (John Deere)
+
+### Enviar archivo PMM a John Deere
+
+**Endpoint:** `POST /rpm/pmm/send-to-johndeere`
+
+**Descripción:** Envía un archivo RPM de tipo PMM (`.dat`) directamente a John Deere.
+
+**Parámetros:**
+- `file` (FormData, requerido): Archivo `.dat` de tipo PMM
+- `target_client_id` (FormData, opcional): ID del cliente objetivo (solo para superadmins)
+
+**Ejemplo de uso:**
+```javascript
+const formData = new FormData();
+formData.append('file', fileInput.files[0]);
+// Opcional para admins:
+// formData.append('target_client_id', '7');
+
+const response = await fetch('/rpm/pmm/send-to-johndeere', {
   method: 'POST',
   headers: {
-    'Authorization': `Bearer ${access_token}`
+    'Authorization': `Bearer ${accessToken}`
   },
-  body: formData2
+  body: formData
 });
 ```
 
-### 5. **Visualizar Órdenes y Transferencias**
-```javascript
-// Obtener lista de órdenes
-const orders = await fetch('/prism/orders', {
-  headers: { 'Authorization': `Bearer ${access_token}` }
-});
-const ordersList = await orders.json();
+### Enviar archivo PARTSDATA a John Deere
 
-// Para cada orden, obtener sus items
-for (const order of ordersList) {
-  const items = await fetch(`/prism/orders/${order.id}/items`, {
-    headers: { 'Authorization': `Bearer ${access_token}` }
-  });
-  order.items = await items.json();
+**Endpoint:** `POST /rpm/partsdata/send-to-johndeere`
+
+**Descripción:** Envía un archivo RPM de tipo PARTSDATA (`.DPMBRA`) directamente a John Deere.
+
+**Parámetros:**
+- `file` (FormData, requerido): Archivo `.DPMBRA` de tipo PARTSDATA
+- `target_client_id` (FormData, opcional): ID del cliente objetivo (solo para superadmins)
+
+### Enviar archivo ORDERS a John Deere
+
+**Endpoint:** `POST /rpm/orders/send-to-johndeere`
+
+**Descripción:** Envía un archivo RPM de tipo ORDERS (`.dat`) directamente a John Deere.
+
+**Parámetros:**
+- `file` (FormData, requerido): Archivo `.dat` de tipo ORDERS
+- `target_client_id` (FormData, opcional): ID del cliente objetivo (solo para superadmins)
+
+### Enviar archivo TRANSFERS a John Deere
+
+**Endpoint:** `POST /rpm/transfers/send-to-johndeere`
+
+**Descripción:** Envía un archivo RPM de tipo TRANSFERS (`.dat`) directamente a John Deere.
+
+**Parámetros:**
+- `file` (FormData, requerido): Archivo `.dat` de tipo TRANSFERS
+- `target_client_id` (FormData, opcional): ID del cliente objetivo (solo para superadmins)
+
+**Respuesta exitosa (200) - Ejemplo RPM:**
+```json
+{
+  "success": true,
+  "message": "Archivo RPM (pmm) enviado exitosamente a John Deere",
+  "filename": "archivo.dat",
+  "file_type": "pmm",
+  "client_id": 7,
+  "john_deere_response": "OK",
+  "sent_at": "2024-01-15T10:30:00Z",
+  "processed_by": "usuario@ejemplo.com"
+}
+```
+
+**Respuesta exitosa para PARTSDATA (incluye IDs procesados):**
+```json
+{
+  "success": true,
+  "message": "Archivo RPM (partsdata) enviado exitosamente a John Deere",
+  "filename": "archivo.DPMBRA",
+  "file_type": "partsdata",
+  "client_id": 7,
+  "john_deere_response": "OK",
+  "sent_at": "2024-01-15T10:30:00Z",
+  "processed_by": "usuario@ejemplo.com",
+  "partsdata_ids": {
+    "order_ids_count": 5,
+    "transfer_ids_count": 3,
+    "total_ids": 8
+  }
 }
 ```
 
 ---
 
-## ⚠️ Códigos de Estado HTTP
+## Endpoints SEEDZ
 
-- `200 OK` - Solicitud exitosa
-- `400 Bad Request` - Datos inválidos en el request
-- `401 Unauthorized` - Token inválido o expirado
-- `403 Forbidden` - Sin permisos para realizar la acción
-- `404 Not Found` - Recurso no encontrado
-- `500 Internal Server Error` - Error del servidor
+### Enviar archivo de Invoices
+
+**Endpoint:** `POST /seedz/invoices`
+
+**Descripción:** Envía un archivo de facturas directamente a Seedz.
+
+**Parámetros:**
+- `file` (FormData, requerido): Archivo CSV de invoices
+- `target_client_id` (FormData, opcional): ID del cliente objetivo (solo para superadmins)
+
+### Enviar archivo de Invoice Items
+
+**Endpoint:** `POST /seedz/invoice_items`
+
+**Descripción:** Envía un archivo de items de factura directamente a Seedz.
+
+### Enviar archivo de Customers
+
+**Endpoint:** `POST /seedz/customers`
+
+**Descripción:** Envía un archivo de clientes directamente a Seedz.
+
+### Enviar archivo de Items
+
+**Endpoint:** `POST /seedz/items`
+
+**Descripción:** Envía un archivo de items directamente a Seedz.
+
+### Enviar archivo de Items Branding
+
+**Endpoint:** `POST /seedz/items-branding`
+
+**Descripción:** Envía un archivo de items con branding directamente a Seedz.
+
+### Enviar archivo de Orders
+
+**Endpoint:** `POST /seedz/orders`
+
+**Descripción:** Envía un archivo de órdenes directamente a Seedz.
+
+### Enviar archivo de Address
+
+**Endpoint:** `POST /seedz/address`
+
+**Descripción:** Envía un archivo de direcciones directamente a Seedz.
+
+### Enviar archivo de Items Group
+
+**Endpoint:** `POST /seedz/items-group`
+
+**Descripción:** Envía un archivo de grupos de items directamente a Seedz.
+
+### Enviar archivo de Sellers
+
+**Endpoint:** `POST /seedz/sellers`
+
+**Descripción:** Envía un archivo de vendedores directamente a Seedz.
+
+**Ejemplo de uso (todos los endpoints SEEDZ):**
+```javascript
+const formData = new FormData();
+formData.append('file', fileInput.files[0]);
+// Opcional para admins:
+// formData.append('target_client_id', '7');
+
+const response = await fetch('/seedz/invoices', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${accessToken}`
+  },
+  body: formData
+});
+
+const result = await response.json();
+```
+
+**Respuesta exitosa (200) - Ejemplo SEEDZ:**
+```json
+{
+  "success": true,
+  "message": "Archivo invoices enviado exitosamente a Seedz",
+  "filename": "invoices.csv",
+  "file_type": "invoices",
+  "client_id": 7,
+  "seedz_response": "OK",
+  "sent_at": "2024-01-15T10:30:00Z",
+  "processed_by": "usuario@ejemplo.com"
+}
+```
 
 ---
 
-## 🔑 Permisos y Roles
+## Manejo de Errores
 
-### Superadmin (`global_role: "superadmin"`)
-- ✅ Crear clientes
-- ✅ Crear usuarios para cualquier cliente
-- ✅ Ver todos los clientes
-- ✅ Ver todos los usuarios
-- ✅ Gestionar aplicaciones
-- ✅ Asignar aplicaciones a clientes
-- ✅ Subir archivos para cualquier cliente (debe especificar `target_client_id`)
+Todos los endpoints retornan errores en el siguiente formato:
 
-### Admin de Cliente (`role: "admin"`, `global_role: "user"`)
-- ✅ Crear usuarios para su propio cliente
-- ✅ Ver usuarios de su cliente
-- ✅ Ver aplicaciones de su cliente
-- ✅ Subir archivos para su cliente (no necesita `target_client_id`)
+```json
+{
+  "detail": "Mensaje de error descriptivo"
+}
+```
 
-### Usuario Normal (`role: "user"`, `global_role: "user"`)
-- ✅ Ver información de su cliente
-- ✅ Ver sus propias aplicaciones
-- ✅ Subir archivos para su cliente
+### Códigos de estado HTTP comunes:
+
+- **200 OK**: Archivo enviado exitosamente
+- **400 Bad Request**: 
+  - Archivo vacío
+  - Extensión de archivo incorrecta
+  - Tipo de archivo no válido
+  - `client_id` inválido
+- **401 Unauthorized**: 
+  - Token de autenticación faltante o inválido
+  - Token expirado
+- **403 Forbidden**: 
+  - Usuario sin permisos para la aplicación
+  - Usuario sin cliente asignado
+  - Usuario normal intentando especificar `target_client_id`
+  - Credenciales inactivas
+- **404 Not Found**: 
+  - Credenciales no encontradas para el cliente
+- **500 Internal Server Error**: 
+  - Error al comunicarse con el servicio externo
+  - Error interno del servidor
 
 ---
 
-## 📝 Notas Importantes
+## Ejemplos de Código
 
-1. **Tokens**: Los tokens de acceso expiran en 5 minutos (configurable). Usa el refresh token para renovarlos.
+### Ejemplo completo con React
 
-2. **Filtrado Automático**: Los endpoints filtran automáticamente por `client_id` del usuario autenticado. No puedes ver datos de otros clientes (a menos que seas superadmin).
+```javascript
+import React, { useState } from 'react';
 
-3. **Archivos**: Los archivos ORD/TRF deben seguir el formato específico:
-   - Primera línea: `ORDER\t<ID>` o `TRNSFR\t<ID>`
-   - Líneas siguientes: Datos separados por tabulaciones
+function FileUploader({ endpoint, accessToken, isAdmin, targetClientId }) {
+  const [file, setFile] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState(null);
 
-4. **Superadmin y target_client_id**: Cuando un superadmin sube archivos, DEBE especificar `target_client_id` en el FormData.
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!file) {
+      setError('Por favor selecciona un archivo');
+      return;
+    }
 
-5. **Estructura de Datos**: Los datos se guardan en dos estructuras:
-   - **Nueva (PRISM)**: Header/Items relacional (`/prism/orders`, `/prism/transfers`)
-   - **Legacy**: Tablas planas (mantiene compatibilidad)
+    setLoading(true);
+    setError(null);
+    setResult(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      // Si es admin y especificó un client_id, agregarlo
+      if (isAdmin && targetClientId) {
+        formData.append('target_client_id', targetClientId);
+      }
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`
+        },
+        body: formData
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.detail || 'Error al enviar el archivo');
+      }
+
+      setResult(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <input
+        type="file"
+        onChange={(e) => setFile(e.target.files[0])}
+        disabled={loading}
+      />
+      
+      {isAdmin && (
+        <input
+          type="number"
+          placeholder="Client ID (opcional)"
+          onChange={(e) => setTargetClientId(e.target.value)}
+        />
+      )}
+
+      <button type="submit" disabled={loading || !file}>
+        {loading ? 'Enviando...' : 'Enviar Archivo'}
+      </button>
+
+      {error && <div className="error">{error}</div>}
+      
+      {result && (
+        <div className="success">
+          <p>{result.message}</p>
+          <p>Archivo: {result.filename}</p>
+          <p>Cliente: {result.client_id}</p>
+        </div>
+      )}
+    </form>
+  );
+}
+```
+
+### Ejemplo con Axios
+
+```javascript
+import axios from 'axios';
+
+async function sendFileToJohnDeere(file, accessToken, targetClientId = null) {
+  const formData = new FormData();
+  formData.append('file', file);
+  
+  if (targetClientId) {
+    formData.append('target_client_id', targetClientId);
+  }
+
+  try {
+    const response = await axios.post(
+      '/elips/send-to-johndeere',
+      formData,
+      {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'multipart/form-data'
+        }
+      }
+    );
+
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      throw new Error(error.response.data.detail || 'Error al enviar archivo');
+    }
+    throw error;
+  }
+}
+```
+
+### Ejemplo con HTML puro + JavaScript
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Enviar Archivo</title>
+</head>
+<body>
+  <form id="uploadForm">
+    <input type="file" id="fileInput" required />
+    <input type="number" id="clientId" placeholder="Client ID (solo admins)" />
+    <button type="submit">Enviar</button>
+  </form>
+
+  <div id="result"></div>
+
+  <script>
+    document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const fileInput = document.getElementById('fileInput');
+      const clientIdInput = document.getElementById('clientId');
+      const resultDiv = document.getElementById('result');
+      
+      const formData = new FormData();
+      formData.append('file', fileInput.files[0]);
+      
+      if (clientIdInput.value) {
+        formData.append('target_client_id', clientIdInput.value);
+      }
+
+      try {
+        const response = await fetch('/elips/send-to-johndeere', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${yourAccessToken}`
+          },
+          body: formData
+        });
+
+        const data = await response.json();
+        
+        if (response.ok) {
+          resultDiv.innerHTML = `
+            <h3>Éxito!</h3>
+            <p>${data.message}</p>
+            <p>Archivo: ${data.filename}</p>
+            <p>Cliente: ${data.client_id}</p>
+          `;
+        } else {
+          resultDiv.innerHTML = `<p style="color: red;">Error: ${data.detail}</p>`;
+        }
+      } catch (error) {
+        resultDiv.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+      }
+    });
+  </script>
+</body>
+</html>
+```
+
+---
+
+## Notas Importantes
+
+1. **Permisos**: Cada usuario debe tener permisos para la aplicación correspondiente (ELIPS, RPM o SEEDZ) en su cliente.
+
+2. **Superadmins**: Los usuarios con rol `admin` pueden especificar `target_client_id` para enviar archivos en nombre de otros clientes. Si no lo especifican, se usa su propio cliente.
+
+3. **Usuarios normales**: Siempre usan su propio `client_id` y no pueden especificar `target_client_id`.
+
+4. **Credenciales**: Las credenciales (dealer_id, client_id, secret) se obtienen automáticamente desde la base de datos según el `client_id` utilizado.
+
+5. **Sin almacenamiento**: Los archivos se envían directamente a los servicios externos **sin guardarse en Blob Storage**.
+
+6. **Logs**: Todos los envíos (exitosos o fallidos) se registran automáticamente en la base de datos para auditoría.
+
+---
+
+## Base URL
+
+Asegúrate de usar la URL base correcta según tu entorno:
+
+- **Desarrollo**: `http://localhost:8000`
+- **Producción**: `https://tu-dominio.com`
+
+Ejemplo completo de URL:
+```
+https://tu-dominio.com/elips/send-to-johndeere
+```

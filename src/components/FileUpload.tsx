@@ -18,19 +18,8 @@ import { useToast } from '../hooks/use-toast';
 import { useDealerContext } from '@/context/DealerContext';
 import { 
   checkAppAccess,
-  getRpmCredentials,
-  getElipsCredentials,
-  getSeedzCredentials,
-  getJohnDeereOAuthToken,
-  getSeedzOAuthToken,
   sendFileToJohnDeere,
-  sendFileToSeedz,
-  getProcessedOrderIds,
-  getProcessedTransferIds,
-  markOrdersAsSent,
-  markTransfersAsSent,
-  createLog,
-  modifyPartsDataFile
+  sendFileToSeedz
 } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
 
@@ -44,6 +33,7 @@ type FileSendType =
   | 'seedz-items'
   | 'seedz-items-branding'
   | 'seedz-orders'
+  | 'seedz-address'
   | 'seedz-items-group'
   | 'seedz-sellers';
 
@@ -104,11 +94,11 @@ const FileUpload = () => {
     return null;
   };
 
-  // Mapear tipo de envío a tipo de archivo para SEEDZ
+  // Mapear tipo de envío a tipo de archivo para SEEDZ (según API_COMPLETE_REFERENCE.md)
   const getSeedzFileType = (sendType: FileSendType): string => {
     switch (sendType) {
       case 'seedz-invoice':
-        return 'invoice';
+        return 'invoices'; // Endpoint es /seedz/invoices (plural)
       case 'seedz-invoice_items':
         return 'invoice_items';
       case 'seedz-customers':
@@ -119,6 +109,8 @@ const FileUpload = () => {
         return 'items-branding';
       case 'seedz-orders':
         return 'orders';
+      case 'seedz-address':
+        return 'address';
       case 'seedz-items-group':
         return 'items-group';
       case 'seedz-sellers':
@@ -208,143 +200,59 @@ const FileUpload = () => {
     ));
 
     try {
-      let fileToSend = fileToUpload.file;
       let result: any;
-      const clientId = user?.client_id || 7;
 
-      // FLUJO: Envío directo a John Deere/SEEDZ (como DTF Agent)
+      // Determinar target_client_id si es superadmin
+      const dealer = dealers.find(d => d.id === selectedDealer);
+      const targetClientId = user?.global_role === 'admin' && dealer?.clientId
+        ? (typeof dealer.clientId === 'string' ? parseInt(dealer.clientId, 10) : dealer.clientId)
+        : undefined;
+
+      // FLUJO: Envío usando endpoints de FourK API (el backend maneja todo)
       if (fileToUpload.sendType.startsWith('johndeere-')) {
         // John Deere: PMM, PartsData, ELIPS
         
-        // Paso 1: Obtener credenciales desde FourK API (para obtener dealer_id)
         setUploadFiles(prev => prev.map(f =>
-          f.id === fileId ? { ...f, progress: 20 } : f
-        ));
-        
-        let credentials;
-        if (fileToUpload.sendType === 'johndeere-elips') {
-          credentials = await getElipsCredentials();
-        } else {
-          credentials = await getRpmCredentials();
-        }
-
-        // Paso 2: Obtener token OAuth usando GET /johndeere/bearer-token
-        setUploadFiles(prev => prev.map(f =>
-          f.id === fileId ? { ...f, progress: 40 } : f
-        ));
-        
-        // Determinar target_client_id si es superadmin
-        const dealer = dealers.find(d => d.id === selectedDealer);
-        const targetClientId = user?.global_role === 'admin' && dealer?.clientId
-          ? (typeof dealer.clientId === 'string' ? parseInt(dealer.clientId, 10) : dealer.clientId)
-          : undefined;
-        
-        const oauthToken = await getJohnDeereOAuthToken(credentials, targetClientId);
-
-        // Paso 3: Si es PartsData, obtener IDs y modificar archivo
-        if (fileToUpload.sendType === 'johndeere-partsdata') {
-          setUploadFiles(prev => prev.map(f =>
-            f.id === fileId ? { ...f, progress: 50 } : f
-          ));
-          
-          const orderIds = await getProcessedOrderIds();
-          const transferIds = await getProcessedTransferIds();
-          
-          const orderIdList = Array.isArray(orderIds) ? orderIds.map((o: any) => o.order_id || o.id) : [];
-          const transferIdList = Array.isArray(transferIds) ? transferIds.map((t: any) => t.transfer_id || t.id) : [];
-          
-          if (orderIdList.length > 0 || transferIdList.length > 0) {
-            fileToSend = await modifyPartsDataFile(fileToSend, orderIdList, transferIdList);
-          }
-        }
-
-        // Paso 4: Enviar archivo DIRECTAMENTE a John Deere desde el navegador
-        setUploadFiles(prev => prev.map(f =>
-          f.id === fileId ? { ...f, progress: 60 } : f
+          f.id === fileId ? { ...f, progress: 30 } : f
         ));
         
         const fileType = fileToUpload.sendType.replace('johndeere-', '') as 'pmm' | 'partsdata' | 'elips';
+        
+        // El backend maneja:
+        // - Obtención de credenciales
+        // - Obtención de token OAuth
+        // - Modificación de PartsData (si aplica)
+        // - Envío a John Deere
+        // - Marcado de orders/transfers como enviados (si aplica)
+        // - Guardado en Blob Storage
+        // - Creación de log
         result = await sendFileToJohnDeere(
-          fileToSend,
-          credentials.dealer_id,
-          oauthToken,
-          fileType
+          fileToUpload.file,
+          fileType,
+          targetClientId
         );
-
-        // Paso 5: Si es PartsData y exitoso, marcar como enviados
-        if (fileToUpload.sendType === 'johndeere-partsdata' && result) {
-          setUploadFiles(prev => prev.map(f =>
-            f.id === fileId ? { ...f, progress: 80 } : f
-          ));
-          
-          try {
-            const orderIds = await getProcessedOrderIds();
-            const transferIds = await getProcessedTransferIds();
-            
-            const orderIdList = Array.isArray(orderIds) ? orderIds.map((o: any) => o.order_id || o.id) : [];
-            const transferIdList = Array.isArray(transferIds) ? transferIds.map((t: any) => t.transfer_id || t.id) : [];
-            
-            if (orderIdList.length > 0) {
-              await markOrdersAsSent(orderIdList);
-            }
-            if (transferIdList.length > 0) {
-              await markTransfersAsSent(transferIdList);
-            }
-          } catch (e) {
-            console.error('Error marcando como enviados:', e);
-            // No fallar el envío si esto falla
-          }
-        }
 
       } else if (fileToUpload.sendType.startsWith('seedz-')) {
         // SEEDZ
         
-        // Paso 1: Obtener credenciales desde FourK API (opcional, solo para referencia)
         setUploadFiles(prev => prev.map(f =>
-          f.id === fileId ? { ...f, progress: 20 } : f
-        ));
-        
-        // No necesitamos las credenciales, solo el token
-        // const credentials = await getSeedzCredentials();
-
-        // Paso 2: Obtener token OAuth usando GET /seedz/bearer-token
-        setUploadFiles(prev => prev.map(f =>
-          f.id === fileId ? { ...f, progress: 40 } : f
-        ));
-        
-        // Determinar target_client_id si es superadmin
-        const dealer = dealers.find(d => d.id === selectedDealer);
-        const targetClientId = user?.global_role === 'admin' && dealer?.clientId
-          ? (typeof dealer.clientId === 'string' ? parseInt(dealer.clientId, 10) : dealer.clientId)
-          : undefined;
-        
-        const oauthToken = await getSeedzOAuthToken({}, targetClientId);
-
-        // Paso 3: Enviar archivo DIRECTAMENTE a SEEDZ desde el navegador
-        setUploadFiles(prev => prev.map(f =>
-          f.id === fileId ? { ...f, progress: 60 } : f
+          f.id === fileId ? { ...f, progress: 30 } : f
         ));
         
         const seedzFileType = getSeedzFileType(fileToUpload.sendType);
-        result = await sendFileToSeedz(fileToSend, seedzFileType, oauthToken);
-      }
-
-      // Paso 6: Crear log en FourK API
-      setUploadFiles(prev => prev.map(f =>
-        f.id === fileId ? { ...f, progress: 90 } : f
-      ));
-      
-      try {
-        await createLog({
-          file_type: fileToUpload.sendType.replace('johndeere-', '').replace('seedz-', ''),
-          filename: fileToUpload.file.name,
-          client_id: clientId,
-          success: true,
-          message: `Archivo enviado exitosamente directamente a ${fileToUpload.sendType.startsWith('johndeere-') ? 'John Deere' : 'SEEDZ'}`
-        });
-      } catch (e) {
-        console.error('Error creando log:', e);
-        // No fallar el envío si esto falla
+        
+        // El backend maneja:
+        // - Obtención de credenciales
+        // - Obtención de token OAuth
+        // - Conversión CSV a JSON (si aplica)
+        // - Envío a SEEDZ
+        // - Guardado en Blob Storage
+        // - Creación de log
+        result = await sendFileToSeedz(
+          fileToUpload.file,
+          seedzFileType,
+          targetClientId
+        );
       }
 
       setUploadFiles(prev => prev.map(f =>
@@ -353,7 +261,7 @@ const FileUpload = () => {
       
       toast({
         title: "✅ Envío exitoso",
-        description: `Archivo ${fileToUpload.file.name} enviado directamente a ${fileToUpload.sendType.startsWith('johndeere-') ? 'John Deere' : 'SEEDZ'}`,
+        description: `Archivo ${fileToUpload.file.name} enviado exitosamente a ${fileToUpload.sendType.startsWith('johndeere-') ? 'John Deere' : 'SEEDZ'}`,
         variant: "default",
         duration: 5000
       });
@@ -590,6 +498,7 @@ const FileUpload = () => {
                                 <SelectItem value="seedz-items">Items</SelectItem>
                                 <SelectItem value="seedz-items-branding">Items Branding</SelectItem>
                                 <SelectItem value="seedz-orders">Orders</SelectItem>
+                                <SelectItem value="seedz-address">Address</SelectItem>
                                 <SelectItem value="seedz-items-group">Items Group</SelectItem>
                                 <SelectItem value="seedz-sellers">Sellers</SelectItem>
                               </optgroup>

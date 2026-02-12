@@ -308,76 +308,71 @@ export async function getSeedzOAuthToken(credentials: any, targetClientId?: numb
 }
 
 /**
- * Envía archivo directamente a John Deere
+ * Envía archivo a John Deere usando endpoint de FourK API
+ * El backend maneja todo el proceso (OAuth, envío, etc.)
  */
 export async function sendFileToJohnDeere(
   file: File,
-  dealerId: string,
-  oauthToken: string,
-  fileType: 'pmm' | 'partsdata' | 'elips'
+  fileType: 'pmm' | 'partsdata' | 'elips',
+  targetClientId?: number
 ): Promise<any> {
-  const johnDeereUrl = `https://servicesext.deere.com/dtfapi/dbs/dealer/${dealerId}/files`;
+  let endpoint = '';
   
-  const response = await fetch(johnDeereUrl, {
-    method: 'PUT',
-    headers: {
-      'Authorization': `Bearer ${oauthToken}`,
-    },
-    body: file,
+  if (fileType === 'pmm') {
+    endpoint = '/rpm/pmm/send-to-johndeere';
+  } else if (fileType === 'partsdata') {
+    endpoint = '/rpm/partsdata/send-to-johndeere';
+  } else if (fileType === 'elips') {
+    endpoint = '/elips/send-to-johndeere';
+  } else {
+    throw new Error('Tipo de archivo no válido');
+  }
+  
+  const formData = new FormData();
+  formData.append('file', file);
+  if (targetClientId) {
+    formData.append('target_client_id', targetClientId.toString());
+  }
+  
+  const response = await apiRequest(endpoint, {
+    method: 'POST',
+    body: formData,
   });
   
   if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Error enviando archivo a John Deere: ${error}`);
+    const error = await response.json().catch(() => ({ detail: 'Error enviando archivo' }));
+    throw new Error(error.detail || 'Error enviando archivo a John Deere');
   }
   
   return await response.json();
 }
 
 /**
- * Envía archivo directamente a SEEDZ
+ * Envía archivo a SEEDZ usando endpoint de FourK API
+ * El backend maneja todo el proceso (OAuth, envío, conversión CSV, etc.)
  */
 export async function sendFileToSeedz(
   file: File,
-  fileType: string,
-  oauthToken: string
+  seedzFileType: string,
+  targetClientId?: number
 ): Promise<any> {
-  // Convertir CSV a JSON si es necesario
-  let fileContent: string;
-  let contentType = 'application/json';
+  // Mapear tipos de SEEDZ a endpoints
+  const endpoint = `/seedz/${seedzFileType}`;
   
-  if (file.name.toLowerCase().endsWith('.csv')) {
-    // Leer CSV y convertir a JSON
-    const text = await file.text();
-    const lines = text.split('\n').filter(line => line.trim());
-    const headers = lines[0].split(',');
-    const data = lines.slice(1).map(line => {
-      const values = line.split(',');
-      const obj: any = {};
-      headers.forEach((header, index) => {
-        obj[header.trim()] = values[index]?.trim() || '';
-      });
-      return obj;
-    });
-    fileContent = JSON.stringify(data);
-  } else {
-    fileContent = await file.text();
+  const formData = new FormData();
+  formData.append('file', file);
+  if (targetClientId) {
+    formData.append('target_client_id', targetClientId.toString());
   }
   
-  const seedzUrl = `https://api.seedz.com.br/integration/v1/${fileType}`;
-  
-  const response = await fetch(seedzUrl, {
+  const response = await apiRequest(endpoint, {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${oauthToken}`,
-      'Content-Type': contentType,
-    },
-    body: fileContent,
+    body: formData,
   });
   
   if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Error enviando archivo a SEEDZ: ${error}`);
+    const error = await response.json().catch(() => ({ detail: 'Error enviando archivo' }));
+    throw new Error(error.detail || 'Error enviando archivo a SEEDZ');
   }
   
   return await response.json();
