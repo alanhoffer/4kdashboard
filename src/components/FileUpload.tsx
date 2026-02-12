@@ -1,11 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import axios from 'axios';
 import {
   Upload,
   File,
@@ -17,6 +16,36 @@ import {
 } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
 import { useDealerContext } from '@/context/DealerContext';
+import { 
+  checkAppAccess,
+  getRpmCredentials,
+  getElipsCredentials,
+  getSeedzCredentials,
+  getJohnDeereOAuthToken,
+  getSeedzOAuthToken,
+  sendFileToJohnDeere,
+  sendFileToSeedz,
+  getProcessedOrderIds,
+  getProcessedTransferIds,
+  markOrdersAsSent,
+  markTransfersAsSent,
+  createLog,
+  modifyPartsDataFile
+} from '@/lib/api';
+import { useAuth } from '@/context/AuthContext';
+
+type FileSendType = 
+  | 'johndeere-pmm' 
+  | 'johndeere-partsdata' 
+  | 'johndeere-elips'
+  | 'seedz-invoice'
+  | 'seedz-invoice_items'
+  | 'seedz-customers'
+  | 'seedz-items'
+  | 'seedz-items-branding'
+  | 'seedz-orders'
+  | 'seedz-items-group'
+  | 'seedz-sellers';
 
 interface UploadFile {
   id: string;
@@ -24,18 +53,94 @@ interface UploadFile {
   progress: number;
   status: 'pending' | 'uploading' | 'completed' | 'error';
   dealerId?: string;
+  sendType?: FileSendType;
+  errorMessage?: string;
 }
 
 const FileUpload = () => {
-
   const { dealers, loading } = useDealerContext();
+  const { user } = useAuth();
 
   const [selectedDealer, setSelectedDealer] = useState<string>('');
   const [uploadFiles, setUploadFiles] = useState<UploadFile[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [hasRpmAccess, setHasRpmAccess] = useState<boolean>(false);
+  const [hasElipsAccess, setHasElipsAccess] = useState<boolean>(false);
+  const [hasSeedzAccess, setHasSeedzAccess] = useState<boolean>(false);
   const { toast } = useToast();
 
   const onlineDealers = dealers; // todos
+
+  // Verificar acceso a aplicaciones al montar el componente
+  useEffect(() => {
+    const checkAccess = async () => {
+      if (user) {
+        const rpm = await checkAppAccess('RPM');
+        const elips = await checkAppAccess('ELIPS');
+        const seedz = await checkAppAccess('SEEDZ');
+        setHasRpmAccess(rpm);
+        setHasElipsAccess(elips);
+        setHasSeedzAccess(seedz);
+      }
+    };
+    checkAccess();
+  }, [user]);
+
+  // Detectar tipo de archivo según extensión
+  const detectFileType = (fileName: string): FileSendType | null => {
+    const ext = fileName.toLowerCase().split('.').pop();
+    
+    // John Deere
+    if (ext === 'dat') return 'johndeere-pmm';
+    if (ext === 'dpmbra') return 'johndeere-partsdata';
+    if (ext === 'json' || ext === 'xml') {
+      // Para JSON/XML, podría ser ELIPS o Seedz, por defecto ELIPS
+      return 'johndeere-elips';
+    }
+    
+    // Seedz acepta JSON y CSV
+    if (ext === 'csv') return 'seedz-invoice'; // Por defecto invoice
+    
+    return null;
+  };
+
+  // Mapear tipo de envío a tipo de archivo para SEEDZ
+  const getSeedzFileType = (sendType: FileSendType): string => {
+    switch (sendType) {
+      case 'seedz-invoice':
+        return 'invoice';
+      case 'seedz-invoice_items':
+        return 'invoice_items';
+      case 'seedz-customers':
+        return 'customers';
+      case 'seedz-items':
+        return 'items';
+      case 'seedz-items-branding':
+        return 'items-branding';
+      case 'seedz-orders':
+        return 'orders';
+      case 'seedz-items-group':
+        return 'items-group';
+      case 'seedz-sellers':
+        return 'sellers';
+      default:
+        throw new Error('Tipo de envío SEEDZ no válido');
+    }
+  };
+
+  // Verificar si el usuario tiene acceso al tipo de envío
+  const hasAccessToSendType = (sendType: FileSendType): boolean => {
+    if (sendType.startsWith('johndeere-pmm') || sendType.startsWith('johndeere-partsdata')) {
+      return hasRpmAccess;
+    }
+    if (sendType.startsWith('johndeere-elips')) {
+      return hasElipsAccess;
+    }
+    if (sendType.startsWith('seedz-')) {
+      return hasSeedzAccess;
+    }
+    return false;
+  };
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
     addFiles(files);
@@ -49,12 +154,16 @@ const FileUpload = () => {
   };
 
   const addFiles = (files: File[]) => {
-    const newFiles: UploadFile[] = files.map(file => ({
-      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-      file,
-      progress: 0,
-      status: 'pending'
-    }));
+    const newFiles: UploadFile[] = files.map(file => {
+      const detectedType = detectFileType(file.name);
+      return {
+        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+        file,
+        progress: 0,
+        status: 'pending',
+        sendType: detectedType || undefined
+      };
+    });
     setUploadFiles(prev => [...prev, ...newFiles]);
   };
 
@@ -63,73 +172,207 @@ const FileUpload = () => {
   };
 
   const simulateUpload = async (fileId: string) => {
-    if (!selectedDealer) {
+    const fileToUpload = uploadFiles.find(f => f.id === fileId);
+    if (!fileToUpload) return;
+
+    // Verificar que tenga tipo de envío asignado
+    if (!fileToUpload.sendType) {
       toast({
-        title: "No dealer selected",
-        description: "Please select a dealer before uploading files.",
+        title: "Tipo de archivo no reconocido",
+        description: "Por favor selecciona manualmente el tipo de envío para este archivo.",
         variant: "destructive"
       });
       return;
     }
 
-    const fileToUpload = uploadFiles.find(f => f.id === fileId);
-    if (!fileToUpload) return;
+    // Verificar acceso a la aplicación
+    if (!hasAccessToSendType(fileToUpload.sendType)) {
+      const appName = fileToUpload.sendType.startsWith('seedz-') ? 'SEEDZ' 
+        : fileToUpload.sendType.startsWith('johndeere-elips') ? 'ELIPS' 
+        : 'RPM';
+      toast({
+        title: "Sin acceso",
+        description: `No tienes acceso a la aplicación ${appName}.`,
+        variant: "destructive"
+      });
+      setUploadFiles(prev => prev.map(f =>
+        f.id === fileId ? { ...f, status: 'error', errorMessage: `Sin acceso a ${appName}` } : f
+      ));
+      return;
+    }
 
     setUploadFiles(prev => prev.map(f =>
       f.id === fileId
-        ? { ...f, status: 'uploading', progress: 0 }
+        ? { ...f, status: 'uploading', progress: 10, errorMessage: undefined }
         : f
     ));
 
-    // Obtener el dealer seleccionado completo para tomar clientId
-    const dealer = dealers.find(d => d.id === selectedDealer);
-    if (!dealer) return;
-
-    // Crear FormData para enviar
-    const formData = new FormData();
-    formData.append('file', fileToUpload.file);
-    formData.append('clientId', dealer.clientId || '');
-
     try {
-      const response = await axios.post('https://4k.xn--cabaahoffer-4db.com.ar/dtf/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-        timeout: 0, // SIN timeout, espera indefinidamente
-        onUploadProgress: (progressEvent) => {
-          const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-          setUploadFiles(prev => prev.map(f =>
-            f.id === fileId ? { ...f, progress } : f
-          ));
+      let fileToSend = fileToUpload.file;
+      let result: any;
+      const clientId = user?.client_id || 7;
+
+      // FLUJO: Envío directo a John Deere/SEEDZ (como DTF Agent)
+      if (fileToUpload.sendType.startsWith('johndeere-')) {
+        // John Deere: PMM, PartsData, ELIPS
+        
+        // Paso 1: Obtener credenciales desde FourK API (para obtener dealer_id)
+        setUploadFiles(prev => prev.map(f =>
+          f.id === fileId ? { ...f, progress: 20 } : f
+        ));
+        
+        let credentials;
+        if (fileToUpload.sendType === 'johndeere-elips') {
+          credentials = await getElipsCredentials();
+        } else {
+          credentials = await getRpmCredentials();
         }
+
+        // Paso 2: Obtener token OAuth usando GET /johndeere/bearer-token
+        setUploadFiles(prev => prev.map(f =>
+          f.id === fileId ? { ...f, progress: 40 } : f
+        ));
+        
+        // Determinar target_client_id si es superadmin
+        const dealer = dealers.find(d => d.id === selectedDealer);
+        const targetClientId = user?.global_role === 'admin' && dealer?.clientId
+          ? (typeof dealer.clientId === 'string' ? parseInt(dealer.clientId, 10) : dealer.clientId)
+          : undefined;
+        
+        const oauthToken = await getJohnDeereOAuthToken(credentials, targetClientId);
+
+        // Paso 3: Si es PartsData, obtener IDs y modificar archivo
+        if (fileToUpload.sendType === 'johndeere-partsdata') {
+          setUploadFiles(prev => prev.map(f =>
+            f.id === fileId ? { ...f, progress: 50 } : f
+          ));
+          
+          const orderIds = await getProcessedOrderIds();
+          const transferIds = await getProcessedTransferIds();
+          
+          const orderIdList = Array.isArray(orderIds) ? orderIds.map((o: any) => o.order_id || o.id) : [];
+          const transferIdList = Array.isArray(transferIds) ? transferIds.map((t: any) => t.transfer_id || t.id) : [];
+          
+          if (orderIdList.length > 0 || transferIdList.length > 0) {
+            fileToSend = await modifyPartsDataFile(fileToSend, orderIdList, transferIdList);
+          }
+        }
+
+        // Paso 4: Enviar archivo DIRECTAMENTE a John Deere desde el navegador
+        setUploadFiles(prev => prev.map(f =>
+          f.id === fileId ? { ...f, progress: 60 } : f
+        ));
+        
+        const fileType = fileToUpload.sendType.replace('johndeere-', '') as 'pmm' | 'partsdata' | 'elips';
+        result = await sendFileToJohnDeere(
+          fileToSend,
+          credentials.dealer_id,
+          oauthToken,
+          fileType
+        );
+
+        // Paso 5: Si es PartsData y exitoso, marcar como enviados
+        if (fileToUpload.sendType === 'johndeere-partsdata' && result) {
+          setUploadFiles(prev => prev.map(f =>
+            f.id === fileId ? { ...f, progress: 80 } : f
+          ));
+          
+          try {
+            const orderIds = await getProcessedOrderIds();
+            const transferIds = await getProcessedTransferIds();
+            
+            const orderIdList = Array.isArray(orderIds) ? orderIds.map((o: any) => o.order_id || o.id) : [];
+            const transferIdList = Array.isArray(transferIds) ? transferIds.map((t: any) => t.transfer_id || t.id) : [];
+            
+            if (orderIdList.length > 0) {
+              await markOrdersAsSent(orderIdList);
+            }
+            if (transferIdList.length > 0) {
+              await markTransfersAsSent(transferIdList);
+            }
+          } catch (e) {
+            console.error('Error marcando como enviados:', e);
+            // No fallar el envío si esto falla
+          }
+        }
+
+      } else if (fileToUpload.sendType.startsWith('seedz-')) {
+        // SEEDZ
+        
+        // Paso 1: Obtener credenciales desde FourK API (opcional, solo para referencia)
+        setUploadFiles(prev => prev.map(f =>
+          f.id === fileId ? { ...f, progress: 20 } : f
+        ));
+        
+        // No necesitamos las credenciales, solo el token
+        // const credentials = await getSeedzCredentials();
+
+        // Paso 2: Obtener token OAuth usando GET /seedz/bearer-token
+        setUploadFiles(prev => prev.map(f =>
+          f.id === fileId ? { ...f, progress: 40 } : f
+        ));
+        
+        // Determinar target_client_id si es superadmin
+        const dealer = dealers.find(d => d.id === selectedDealer);
+        const targetClientId = user?.global_role === 'admin' && dealer?.clientId
+          ? (typeof dealer.clientId === 'string' ? parseInt(dealer.clientId, 10) : dealer.clientId)
+          : undefined;
+        
+        const oauthToken = await getSeedzOAuthToken({}, targetClientId);
+
+        // Paso 3: Enviar archivo DIRECTAMENTE a SEEDZ desde el navegador
+        setUploadFiles(prev => prev.map(f =>
+          f.id === fileId ? { ...f, progress: 60 } : f
+        ));
+        
+        const seedzFileType = getSeedzFileType(fileToUpload.sendType);
+        result = await sendFileToSeedz(fileToSend, seedzFileType, oauthToken);
+      }
+
+      // Paso 6: Crear log en FourK API
+      setUploadFiles(prev => prev.map(f =>
+        f.id === fileId ? { ...f, progress: 90 } : f
+      ));
+      
+      try {
+        await createLog({
+          file_type: fileToUpload.sendType.replace('johndeere-', '').replace('seedz-', ''),
+          filename: fileToUpload.file.name,
+          client_id: clientId,
+          success: true,
+          message: `Archivo enviado exitosamente directamente a ${fileToUpload.sendType.startsWith('johndeere-') ? 'John Deere' : 'SEEDZ'}`
+        });
+      } catch (e) {
+        console.error('Error creando log:', e);
+        // No fallar el envío si esto falla
+      }
+
+      setUploadFiles(prev => prev.map(f =>
+        f.id === fileId ? { ...f, status: 'completed', progress: 100 } : f
+      ));
+      
+      toast({
+        title: "✅ Envío exitoso",
+        description: `Archivo ${fileToUpload.file.name} enviado directamente a ${fileToUpload.sendType.startsWith('johndeere-') ? 'John Deere' : 'SEEDZ'}`,
+        variant: "default",
+        duration: 5000
       });
 
-      if (response.data.success) {
-        setUploadFiles(prev => prev.map(f =>
-          f.id === fileId ? { ...f, status: 'completed', progress: 100 } : f
-        ));
-        toast({
-          title: "Upload successful",
-          description: `File uploaded to ${dealer.name}`,
-          variant: "default"
-        });
-      } else {
-        setUploadFiles(prev => prev.map(f =>
-          f.id === fileId ? { ...f, status: 'error', progress: 0 } : f
-        ));
-        toast({
-          title: "Upload failed",
-          description: response.data.message || "Unknown error during upload.",
-          variant: "destructive"
-        });
-      }
-    } catch (error) {
+    } catch (error: any) {
       setUploadFiles(prev => prev.map(f =>
-        f.id === fileId ? { ...f, status: 'error', progress: 0 } : f
+        f.id === fileId ? { 
+          ...f, 
+          status: 'error', 
+          progress: 0,
+          errorMessage: error.message 
+        } : f
       ));
+      
+      // El log se crea automáticamente en el backend de FourK API
+      
       toast({
-        title: "Upload error",
-        description: "Network or server error. Please try again.",
+        title: "Error en el envío",
+        description: error.message || "Error al enviar el archivo. Por favor intenta nuevamente.",
         variant: "destructive"
       });
       console.error('Upload error:', error);
@@ -179,28 +422,32 @@ const FileUpload = () => {
         </CardTitle>
       </CardHeader>
       <CardContent className="p-6 space-y-6">
-        {/* Dealer Selection */}
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-slate-700">Select Target Dealer</label>
-          <Select value={selectedDealer} onValueChange={setSelectedDealer}>
-            <SelectTrigger className="w-full border-slate-300 hover:border-slate-400">
-              <SelectValue placeholder="Choose a dealer to upload files to" />
-            </SelectTrigger>
-            <SelectContent>
-              {onlineDealers.map((dealer) => (
-                <SelectItem key={dealer.id} value={dealer.id}>
-                  <div className="flex items-center gap-2">
-                    <Server className="h-4 w-4 text-slate-500" />
-                    <span>{dealer.name}</span>
-                    <Badge variant="outline" className="ml-2 text-xs">
-                      {dealer.location}
-                    </Badge>
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        {/* Dealer Selection - Solo para superadmins */}
+        {user?.global_role === 'admin' && (
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-slate-700">
+              Select Target Dealer {user?.global_role === 'admin' && '(Opcional para superadmin)'}
+            </label>
+            <Select value={selectedDealer} onValueChange={setSelectedDealer}>
+              <SelectTrigger className="w-full border-slate-300 hover:border-slate-400">
+                <SelectValue placeholder={user?.global_role === 'admin' ? "Dejar vacío para usar tu cliente" : "Choose a dealer"} />
+              </SelectTrigger>
+              <SelectContent>
+                {onlineDealers.map((dealer) => (
+                  <SelectItem key={dealer.id} value={dealer.id}>
+                    <div className="flex items-center gap-2">
+                      <Server className="h-4 w-4 text-slate-500" />
+                      <span>{dealer.name}</span>
+                      <Badge variant="outline" className="ml-2 text-xs">
+                        {dealer.location}
+                      </Badge>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
         {/* File Drop Zone */}
         <div
@@ -257,10 +504,10 @@ const FileUpload = () => {
                 <Button
                   size="sm"
                   onClick={uploadAllFiles}
-                  disabled={!selectedDealer || uploadFiles.every(f => f.status !== 'pending')}
+                  disabled={uploadFiles.every(f => f.status !== 'pending' || !f.sendType)}
                   className="bg-indigo-600 hover:bg-indigo-700"
                 >
-                  Upload All
+                  Enviar Todos
                 </Button>
               </div>
             </div>
@@ -281,14 +528,14 @@ const FileUpload = () => {
                         {uploadFile.file.name}
                       </p>
                       <div className="flex items-center gap-2">
+                        {uploadFile.sendType && (
+                          <Badge variant="outline" className="text-xs">
+                            {uploadFile.sendType.replace('johndeere-', 'JD ').replace('seedz-', 'Seedz ')}
+                          </Badge>
+                        )}
                         <Badge className={`text-xs ${getStatusColor(uploadFile.status)}`}>
                           {uploadFile.status}
                         </Badge>
-                        {uploadFile.dealerId && (
-                          <Badge variant="outline" className="text-xs">
-                            {dealers.find(s => s.id === uploadFile.dealerId)?.name}
-                          </Badge>
-                        )}
                       </div>
                     </div>
 
@@ -299,8 +546,57 @@ const FileUpload = () => {
                       )}
                     </div>
 
+                    {uploadFile.errorMessage && (
+                      <p className="text-xs text-red-600 mt-1">{uploadFile.errorMessage}</p>
+                    )}
+
                     {uploadFile.status === 'uploading' && (
                       <Progress value={uploadFile.progress} className="h-1 mt-2" />
+                    )}
+
+                    {/* Selector de tipo de envío si no se detectó automáticamente */}
+                    {!uploadFile.sendType && uploadFile.status === 'pending' && (
+                      <div className="mt-2">
+                        <Select
+                          value={uploadFile.sendType || ''}
+                          onValueChange={(value: FileSendType) => {
+                            setUploadFiles(prev => prev.map(f =>
+                              f.id === uploadFile.id ? { ...f, sendType: value } : f
+                            ));
+                          }}
+                        >
+                          <SelectTrigger className="w-full text-xs h-8">
+                            <SelectValue placeholder="Seleccionar tipo de envío" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {(hasRpmAccess || hasElipsAccess) && (
+                              <optgroup label="John Deere">
+                                {hasRpmAccess && (
+                                  <>
+                                    <SelectItem value="johndeere-pmm">PMM (.dat)</SelectItem>
+                                    <SelectItem value="johndeere-partsdata">PartsData (.DPMBRA)</SelectItem>
+                                  </>
+                                )}
+                                {hasElipsAccess && (
+                                  <SelectItem value="johndeere-elips">ELIPS (.json, .xml)</SelectItem>
+                                )}
+                              </optgroup>
+                            )}
+                            {hasSeedzAccess && (
+                              <optgroup label="Seedz">
+                                <SelectItem value="seedz-invoice">Invoice</SelectItem>
+                                <SelectItem value="seedz-invoice_items">Invoice Items</SelectItem>
+                                <SelectItem value="seedz-customers">Customers</SelectItem>
+                                <SelectItem value="seedz-items">Items</SelectItem>
+                                <SelectItem value="seedz-items-branding">Items Branding</SelectItem>
+                                <SelectItem value="seedz-orders">Orders</SelectItem>
+                                <SelectItem value="seedz-items-group">Items Group</SelectItem>
+                                <SelectItem value="seedz-sellers">Sellers</SelectItem>
+                              </optgroup>
+                            )}
+                          </SelectContent>
+                        </Select>
+                      </div>
                     )}
                   </div>
 
@@ -310,8 +606,24 @@ const FileUpload = () => {
                         size="sm"
                         variant="ghost"
                         onClick={() => simulateUpload(uploadFile.id)}
-                        disabled={!selectedDealer}
+                        disabled={!uploadFile.sendType}
                         className="h-8 w-8 p-0 text-indigo-600 hover:bg-indigo-50"
+                        title={!uploadFile.sendType ? "Selecciona un tipo de envío primero" : "Enviar archivo"}
+                      >
+                        <Upload className="h-4 w-4" />
+                      </Button>
+                    )}
+                    {uploadFile.status === 'error' && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setUploadFiles(prev => prev.map(f =>
+                            f.id === uploadFile.id ? { ...f, status: 'pending', errorMessage: undefined } : f
+                          ));
+                        }}
+                        className="h-8 w-8 p-0 text-blue-600 hover:bg-blue-50"
+                        title="Reintentar"
                       >
                         <Upload className="h-4 w-4" />
                       </Button>
