@@ -19,6 +19,8 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import ManageServers from "./pages/ManageServers";
 import Transform from "./pages/Transform";
 
+import Admin from "@/pages/Admin";
+
 const queryClient = new QueryClient();
 
 function App() {
@@ -60,6 +62,14 @@ function App() {
                                 } 
                               />
                               <Route 
+                                path="/admin" 
+                                element={
+                                  <ProtectedRoute requireSuperadmin>
+                                    <Admin />
+                                  </ProtectedRoute>
+                                } 
+                              />
+                              <Route 
                                 path="/manage-servers" 
                                 element={
                                   <ProtectedRoute requireSuperadmin>
@@ -79,15 +89,15 @@ function App() {
                                 path="/clients" 
                                 element={
                                   <ProtectedRoute requireSuperadmin>
-                                    <ManageServers />
+                                    <Admin />
                                   </ProtectedRoute>
                                 } 
                               />
                               <Route 
                                 path="/users" 
                                 element={
-                                  <ProtectedRoute requirePermission="manage_users">
-                                    <ManageServers />
+                                  <ProtectedRoute requireSuperadmin>
+                                    <Admin />
                                   </ProtectedRoute>
                                 } 
                               />

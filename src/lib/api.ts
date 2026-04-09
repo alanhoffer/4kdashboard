@@ -465,4 +465,99 @@ export async function modifyPartsDataFile(
   return new File([modifiedContent], file.name, { type: file.type });
 }
 
+// --- Admin API Functions ---
+
+/**
+ * Obtiene todas las aplicaciones (Solo Superadmin)
+ */
+export async function getAllApps() {
+  const response = await apiRequest('/apps/');
+  if (!response.ok) throw new Error('Error obteniendo aplicaciones');
+  return await response.json();
+}
+
+/**
+ * Crea una nueva aplicación (Solo Superadmin)
+ */
+export async function createApp(appData: { name: string, description: string }) {
+  const response = await apiRequest('/apps/', {
+    method: 'POST',
+    body: JSON.stringify(appData),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Error creando aplicación');
+  }
+  return await response.json();
+}
+
+/**
+ * Obtiene todos los clientes (Solo Superadmin)
+ */
+export async function getAllClients() {
+  const response = await apiRequest('/clients/');
+  if (!response.ok) throw new Error('Error obteniendo clientes');
+  const data = await response.json();
+  // El endpoint /clients/ retorna { available_clients: [...] } para superadmin
+  return data.available_clients || [];
+}
+
+/**
+ * Obtiene aplicaciones de un cliente
+ */
+export async function getClientApps(clientId: number) {
+  const response = await apiRequest(`/clients/${clientId}/apps`);
+  if (!response.ok) throw new Error('Error obteniendo aplicaciones del cliente');
+  return await response.json();
+}
+
+/**
+ * Asigna una aplicación a un cliente
+ */
+export async function assignAppToClient(clientId: number, applicationId: number) {
+  const response = await apiRequest(`/clients/${clientId}/apps`, {
+    method: 'POST',
+    body: JSON.stringify({ application_id: applicationId }),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Error asignando aplicación');
+  }
+  return await response.json();
+}
+
+/**
+ * Remueve una aplicación de un cliente
+ */
+export async function removeAppFromClient(clientId: number, appId: number) {
+  const response = await apiRequest(`/clients/${clientId}/apps/${appId}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) throw new Error('Error removiendo aplicación');
+  return await response.json();
+}
+
+/**
+ * Obtiene todos los usuarios (Solo Superadmin)
+ */
+export async function getAllUsers(clientId?: number) {
+  let url = '/users/';
+  if (clientId) url += `?client_id=${clientId}`;
+  
+  const response = await apiRequest(url);
+  if (!response.ok) throw new Error('Error obteniendo usuarios');
+  return await response.json();
+}
+
+/**
+ * Elimina un usuario
+ */
+export async function deleteUser(userId: string) {
+  const response = await apiRequest(`/users/${userId}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) throw new Error('Error eliminando usuario');
+  return await response.json();
+}
+
 export { API_BASE_URL };

@@ -50,6 +50,7 @@ interface UploadFile {
 const FileUpload = () => {
   const { dealers, loading } = useDealerContext();
   const { user } = useAuth();
+  const MAX_FILE_SIZE = 80 * 1024 * 1024; // 80MB en bytes
 
   const [selectedDealer, setSelectedDealer] = useState<string>('');
   const [uploadFiles, setUploadFiles] = useState<UploadFile[]>([]);
@@ -146,7 +147,37 @@ const FileUpload = () => {
   };
 
   const addFiles = (files: File[]) => {
-    const newFiles: UploadFile[] = files.map(file => {
+    // Validar tamaño de archivos
+    const validFiles: File[] = [];
+    const invalidFiles: { name: string; size: number }[] = [];
+
+    files.forEach(file => {
+      if (file.size > MAX_FILE_SIZE) {
+        invalidFiles.push({ name: file.name, size: file.size });
+      } else {
+        validFiles.push(file);
+      }
+    });
+
+    // Mostrar error si hay archivos que exceden el límite
+    if (invalidFiles.length > 0) {
+      invalidFiles.forEach(({ name, size }) => {
+        const sizeMB = (size / (1024 * 1024)).toFixed(2);
+        toast({
+          title: "❌ Archivo demasiado grande",
+          description: `${name} (${sizeMB}MB) excede el límite máximo de 80MB`,
+          variant: "destructive",
+          duration: 5000
+        });
+      });
+    }
+
+    // Solo agregar archivos válidos
+    if (validFiles.length === 0) {
+      return;
+    }
+
+    const newFiles: UploadFile[] = validFiles.map(file => {
       const detectedType = detectFileType(file.name);
       return {
         id: Date.now().toString() + Math.random().toString(36).substr(2, 9),

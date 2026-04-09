@@ -12,7 +12,7 @@ import {
   SidebarHeader,
   SidebarFooter,
 } from "@/components/ui/sidebar";
-import { Server, BarChart3, Hammer, Settings, FolderOpen, MessageCircle, Sun, Moon, FileSpreadsheet, Edit, LogOut, User, Users, Building2 } from 'lucide-react';
+import { Server, BarChart3, Hammer, Settings, FolderOpen, MessageCircle, Sun, Moon, FileSpreadsheet, Edit, LogOut, User, Users, Building2, Shield } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { PermissionGate } from '@/components/PermissionGate';
@@ -90,6 +90,7 @@ export function AppSidebar() {
 
   // Items solo para Superadmin
   const superadminMenuItems = [
+    { title: 'Admin Panel', icon: Shield, href: '/admin', permission: 'manage_clients' as const },
     { title: 'Manage Clients', icon: Building2, href: '/clients', permission: 'manage_clients' as const },
     { title: 'Manage Users', icon: Users, href: '/users', permission: 'manage_users' as const },
     { title: 'Manage Dealers', icon: Edit, href: '/manage-servers', permission: 'manage_dealers' as const },
